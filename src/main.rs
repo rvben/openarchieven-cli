@@ -92,6 +92,12 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::stats::comments::run(client, cache, ctx, &parsed)
             })
         }
+        Cmd::Stats(StatsCmd::Familynames(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::familynames::parse_rest(rest)?;
+                openarchieven::commands::stats::familynames::run(client, cache, ctx, &parsed)
+            })
+        }
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
             "cache info: not yet implemented",
