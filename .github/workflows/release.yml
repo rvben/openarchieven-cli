@@ -21,12 +21,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            maturin_args: --compatibility manylinux_2_28 --zig
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
+            maturin_args: --compatibility manylinux_2_28 --zig
           - target: x86_64-apple-darwin
             os: macos-latest
+            maturin_args: ""
           - target: aarch64-apple-darwin
             os: macos-latest
+            maturin_args: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -37,23 +41,21 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install cross-compilation linker (Linux aarch64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install maturin (with zig for cross-compiled Linux wheels)
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          mkdir -p .cargo
-          cat >> .cargo/config.toml <<'EOF'
-          [target.aarch64-unknown-linux-gnu]
-          linker = "aarch64-linux-gnu-gcc"
-          EOF
+          uv venv "${RUNNER_TEMP}/build-venv"
+          uv pip install --python "${RUNNER_TEMP}/build-venv/bin/python" maturin ziglang
+          echo "${RUNNER_TEMP}/build-venv/bin" >> "$GITHUB_PATH"
 
       - name: Compute version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: make release-build
-        run: make release-build TARGET=${{ matrix.target }}
+      - name: make build-wheel
+        run: make build-wheel TARGET=${{ matrix.target }} MATURIN_ARGS="${{ matrix.maturin_args }}"
 
       - name: make release-archive
         run: |
@@ -61,10 +63,36 @@ jobs:
             TARGET=${{ matrix.target }} \
             VERSION=${{ steps.version.outputs.version }}
 
+      - name: Upload binary archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/*
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: target/wheels/*.whl
+
+  sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install maturin
+        shell: bash
+        run: |
+          uv venv "${RUNNER_TEMP}/build-venv"
+          uv pip install --python "${RUNNER_TEMP}/build-venv/bin/python" maturin
+          echo "${RUNNER_TEMP}/build-venv/bin" >> "$GITHUB_PATH"
+      - name: make build-sdist
+        run: make build-sdist
       - uses: actions/upload-artifact@v4
         with:
-          name: openarchieven-${{ matrix.target }}
-          path: dist/*
+          name: sdist
+          path: target/wheels/*.tar.gz
 
   release:
     name: Publish release
@@ -75,6 +103,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          pattern: binary-*
           path: dist
           merge-multiple: true
 
@@ -97,3 +126,36 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file "$notes_file" \
             dist/*
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: make publish-crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: make publish-crates
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: artifacts/wheels
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: artifacts/sdist
+      - uses: astral-sh/setup-uv@v6
+      - name: make publish-pypi
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: make publish-pypi WHEEL_DIR=artifacts/wheels SDIST_DIR=artifacts/sdist
