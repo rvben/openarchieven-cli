@@ -138,26 +138,7 @@ impl Client {
 
 fn map_error_status(status: reqwest::StatusCode, body: &[u8], retry_after: Option<u64>) -> Error {
     match status.as_u16() {
-        400 => match serde_json::from_slice::<Value>(body) {
-            Ok(v) if v.get("error_code").is_some() => {
-                let code = v
-                    .get("error_code")
-                    .and_then(|c| c.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let desc = v
-                    .get("error_description")
-                    .and_then(|c| c.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                Error::new(ErrorKind::Validation, desc.clone()).with_upstream(code, desc)
-            }
-            _ => {
-                let snippet = String::from_utf8_lossy(body);
-                let trimmed: String = snippet.chars().take(200).collect();
-                Error::new(ErrorKind::Validation, trimmed)
-            }
-        },
+        400 => map_validation_400(body),
         404 => Error::new(ErrorKind::NotFound, "resource not found"),
         429 => {
             let mut e = Error::new(ErrorKind::RateLimit, "API throttled");
@@ -169,6 +150,26 @@ fn map_error_status(status: reqwest::StatusCode, body: &[u8], retry_after: Optio
         s if (500..600).contains(&s) => Error::new(ErrorKind::Server, format!("upstream {s}")),
         s => Error::new(ErrorKind::Server, format!("upstream {s} (unexpected)")),
     }
+}
+
+/// Parse the upstream's structured 400 body once. The Open Archives API
+/// returns `{"error_code","error_description"}`; both are surfaced as
+/// upstream metadata. Falls back to a truncated raw snippet otherwise.
+fn map_validation_400(body: &[u8]) -> Error {
+    let Ok(v) = serde_json::from_slice::<Value>(body) else {
+        let snippet: String = String::from_utf8_lossy(body).chars().take(200).collect();
+        return Error::new(ErrorKind::Validation, snippet);
+    };
+    let code = v.get("error_code").and_then(|c| c.as_str()).unwrap_or("");
+    let desc = v
+        .get("error_description")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if code.is_empty() {
+        let snippet: String = String::from_utf8_lossy(body).chars().take(200).collect();
+        return Error::new(ErrorKind::Validation, snippet);
+    }
+    Error::new(ErrorKind::Validation, desc.to_string()).with_upstream(code, desc)
 }
 
 /// Resolve the API base URL: explicit > env > default. The returned string

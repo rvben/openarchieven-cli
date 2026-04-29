@@ -56,11 +56,11 @@ impl fmt::Display for ErrorKind {
 #[derive(Debug, Error)]
 #[error("{kind}: {message}")]
 pub struct Error {
-    pub kind: ErrorKind,
-    pub message: String,
-    pub upstream_code: Option<String>,
-    pub upstream_message: Option<String>,
-    pub retry_after_seconds: Option<u64>,
+    pub(crate) kind: ErrorKind,
+    pub(crate) message: String,
+    pub(crate) upstream_code: Option<String>,
+    pub(crate) upstream_message: Option<String>,
+    pub(crate) retry_after_seconds: Option<u64>,
 }
 
 impl Error {
