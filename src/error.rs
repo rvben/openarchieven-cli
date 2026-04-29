@@ -16,6 +16,7 @@ pub enum ErrorKind {
     Server,
     Parse,
     Conflict,
+    Io,
 }
 
 impl ErrorKind {
@@ -43,6 +44,7 @@ impl ErrorKind {
             ErrorKind::Server => "server",
             ErrorKind::Parse => "parse",
             ErrorKind::Conflict => "conflict",
+            ErrorKind::Io => "io",
         }
     }
 }
@@ -165,6 +167,7 @@ mod tests {
             ErrorKind::Server,
             ErrorKind::Parse,
             ErrorKind::Conflict,
+            ErrorKind::Io,
         ] {
             assert_eq!(k.exit_code(), 1, "{k:?}");
         }
@@ -180,6 +183,7 @@ mod tests {
         assert!(!ErrorKind::NotFound.retryable());
         assert!(!ErrorKind::Parse.retryable());
         assert!(!ErrorKind::Conflict.retryable());
+        assert!(!ErrorKind::Io.retryable());
     }
 
     #[test]

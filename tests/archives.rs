@@ -97,4 +97,5 @@ fn archives_rejects_limit_with_validation() {
     ctx.offset = Some(0);
     let err = archives::run(&client, Some(&cache), &ctx).unwrap_err();
     assert_eq!(err.kind(), openarchieven::error::ErrorKind::Validation);
+    assert!(err.message().contains("--offset"));
 }

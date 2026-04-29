@@ -73,6 +73,6 @@ where
         global.format,
         false,
     )
-    .map_err(|e| Error::new(ErrorKind::Network, e.to_string()))?;
+    .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?;
     Ok(())
 }
