@@ -140,9 +140,7 @@ impl Client {
 
         Err(map_error_status(status, &body_bytes, retry_after))
     }
-}
 
-impl Client {
     /// Execute a request with retry, jittered exponential backoff, and an
     /// overall deadline derived from the configured timeout. Retries on
     /// transient errors (429, 5xx, network, timeout). Non-retryable errors
@@ -160,29 +158,26 @@ impl Client {
                     if !e.is_retryable_transport() {
                         return Err(e);
                     }
-                    let is_last = attempt + 1 == MAX_ATTEMPTS;
-                    if is_last {
-                        last = Some(e);
-                        break;
-                    }
                     let wait = backoff(attempt, e.retry_after_seconds());
                     last = Some(e);
-                    let now = Instant::now();
-                    let remaining = deadline.saturating_duration_since(now);
-                    if remaining.is_zero() {
-                        return Err(Error::new(ErrorKind::Timeout, "deadline exceeded"));
+                    if attempt + 1 == MAX_ATTEMPTS {
+                        break;
                     }
+                    let remaining = deadline.saturating_duration_since(Instant::now());
                     std::thread::sleep(wait.min(remaining));
                 }
             }
         }
-        Err(last.expect("at least one attempt failed before reaching the loop end"))
+        Err(last.expect("loop only breaks after setting last on a retryable error"))
     }
 }
 
+/// Sleep duration before the next attempt. Honours `Retry-After` verbatim
+/// (the caller caps it against the remaining deadline). Otherwise jitters
+/// exponentially up to `MAX_BACKOFF_MS`.
 fn backoff(attempt: u32, retry_after: Option<u64>) -> Duration {
     if let Some(secs) = retry_after {
-        return Duration::from_secs(secs).min(Duration::from_millis(MAX_BACKOFF_MS));
+        return Duration::from_secs(secs);
     }
     let cap = BASE_BACKOFF_MS
         .saturating_mul(1u64 << attempt)
