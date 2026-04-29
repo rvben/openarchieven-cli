@@ -283,8 +283,7 @@ impl Cache {
             {
                 let de =
                     de.map_err(|e| Error::new(ErrorKind::Validation, format!("dir entry: {e}")))?;
-                let name = de.file_name().to_string_lossy().to_string();
-                if !is_entry_filename(&name) {
+                if !is_entry_filename(&de.file_name().to_string_lossy()) {
                     continue;
                 }
                 let path = de.path();
@@ -312,8 +311,7 @@ impl Cache {
             {
                 let de =
                     de.map_err(|e| Error::new(ErrorKind::Validation, format!("dir entry: {e}")))?;
-                let name = de.file_name().to_string_lossy().to_string();
-                if !is_entry_filename(&name) {
+                if !is_entry_filename(&de.file_name().to_string_lossy()) {
                     continue;
                 }
                 let path = de.path();
@@ -347,6 +345,7 @@ impl Cache {
 
     fn with_exclusive_lock<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
         let lock_path = self.root.join(LOCK_FILENAME);
+        let already_existed = lock_path.exists();
         let lock = OpenOptions::new()
             .read(true)
             .write(true)
@@ -354,17 +353,20 @@ impl Cache {
             .truncate(false)
             .open(&lock_path)
             .map_err(|e| Error::new(ErrorKind::Validation, format!("lock open: {e}")))?;
+        if !already_existed {
+            set_file_private(&lock_path);
+        }
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
+            if Instant::now() >= deadline {
+                return Err(Error::new(
+                    ErrorKind::Validation,
+                    "another openarchieven cache operation is in progress",
+                ));
+            }
             match lock.try_lock_exclusive() {
                 Ok(()) => break,
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    if Instant::now() >= deadline {
-                        return Err(Error::new(
-                            ErrorKind::Validation,
-                            "another openarchieven cache operation is in progress",
-                        ));
-                    }
                     std::thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
@@ -376,11 +378,16 @@ impl Cache {
             }
         }
         let result = f();
+        // The kernel releases the flock when `lock` is dropped (including on
+        // panic unwind), so this explicit unlock is just early cleanup.
         let _ = lock.unlock();
         result
     }
 }
 
+/// Returns true for `<64-hex>.json` filenames produced by [`Cache::key`].
+/// Used by `info`, `clear`, and `prune` to skip foreign files (`.lock`,
+/// `README.txt`, partial `tempfile`s, etc.) when scanning the cache root.
 fn is_entry_filename(name: &str) -> bool {
     name.len() == 69 && name.ends_with(".json") && name[..64].chars().all(|c| c.is_ascii_hexdigit())
 }
@@ -622,18 +629,27 @@ mod ops_tests {
     fn info_counts_entries_and_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
-        let now = Utc::now();
-        let entry = Entry {
+        let older = Utc::now() - chrono::Duration::hours(2);
+        let newer = Utc::now();
+        let entry_old = Entry {
             url: "u".into(),
-            fetched_at: now,
-            expires_at: Some(now + chrono::Duration::hours(1)),
+            fetched_at: older,
+            expires_at: Some(older + chrono::Duration::hours(1)),
             body: json!({}),
         };
-        cache.put("a".repeat(64).as_str(), &entry);
-        cache.put("b".repeat(64).as_str(), &entry);
+        let entry_new = Entry {
+            url: "u".into(),
+            fetched_at: newer,
+            expires_at: Some(newer + chrono::Duration::hours(1)),
+            body: json!({}),
+        };
+        cache.put("a".repeat(64).as_str(), &entry_old);
+        cache.put("b".repeat(64).as_str(), &entry_new);
         let info = cache.info().unwrap();
         assert_eq!(info.entries, 2);
         assert!(info.bytes > 0);
+        assert_eq!(info.oldest, Some(older));
+        assert_eq!(info.newest, Some(newer));
     }
 
     #[test]
@@ -651,6 +667,9 @@ mod ops_tests {
         let n = cache.clear().unwrap();
         assert_eq!(n, 1);
         assert!(dir.path().join("README.txt").exists());
+        // .lock is created by clear() itself and must persist (so a concurrent
+        // operation can still observe it).
+        assert!(dir.path().join(".lock").exists());
     }
 
     #[test]
