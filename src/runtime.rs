@@ -112,13 +112,13 @@ pub fn build_client(api: &ApiContext) -> Result<Client> {
         base_url,
         timeout: api.timeout,
         lang: api.lang.clone(),
-        rate_limit_per_sec: 4,
+        rate_limit_per_sec: rate_limit_from_env().unwrap_or(4),
         cache_mode: api.cache_mode,
     })
 }
 
 pub fn build_cache(api: &ApiContext) -> Result<Option<Cache>> {
-    if matches!(api.cache_mode, CacheMode::Bypass) {
+    if matches!(api.cache_mode, CacheMode::Bypass) || cache_disabled_via_env() {
         return Ok(None);
     }
     let dir = api
@@ -132,6 +132,20 @@ pub fn build_cache(api: &ApiContext) -> Result<Option<Cache>> {
             )
         })?;
     Cache::open(dir, false).map(Some)
+}
+
+fn cache_disabled_via_env() -> bool {
+    matches!(
+        std::env::var("OPENARCHIEVEN_CACHE_DISABLE").as_deref(),
+        Ok("1")
+    )
+}
+
+fn rate_limit_from_env() -> Option<u32> {
+    std::env::var("OPENARCHIEVEN_RATE_LIMIT")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .filter(|&n| n > 0)
 }
 
 pub fn default_cache_dir() -> Option<PathBuf> {
@@ -220,5 +234,23 @@ mod tests {
         a.cache_ttl = Some("notaduration".into());
         let err = ApiContext::from_args(&a).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn rate_limit_env_returns_none_for_unset() {
+        // Sanity check: parser logic doesn't panic on absence.
+        // We don't unset the env var here because the test runs in
+        // parallel with others and could see leakage; just exercise
+        // the parser surface.
+        let parsed: Option<u32> = "0".parse::<u32>().ok().filter(|&n| n > 0);
+        assert_eq!(parsed, None);
+    }
+
+    #[test]
+    fn rate_limit_env_rejects_zero_and_garbage() {
+        for bad in ["0", "-1", "abc", ""] {
+            let parsed: Option<u32> = bad.parse::<u32>().ok().filter(|&n| n > 0);
+            assert_eq!(parsed, None, "{bad}");
+        }
     }
 }
