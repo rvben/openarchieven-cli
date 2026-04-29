@@ -39,7 +39,7 @@ urlencoding = "2"
 
 [dev-dependencies]
 assert_cmd = "2"
-insta = { version = "1", features = ["json"] }
+insta = { version = "1", features = ["json", "redactions"] }
 predicates = "3"
 tokio = { version = "1", features = ["rt", "macros"] }
 wiremock = "0.6"

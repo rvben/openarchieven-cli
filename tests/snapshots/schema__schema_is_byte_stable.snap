@@ -1,0 +1,1149 @@
+---
+source: tests/schema.rs
+assertion_line: 12
+expression: s
+---
+{
+  "name": "openarchieven",
+  "version": "[version]",
+  "base_url": "https://api.openarchieven.nl/1.1",
+  "rate_limit": {
+    "requests_per_second": 4,
+    "scope": "per_ip"
+  },
+  "output_formats": [
+    "json",
+    "table",
+    "markdown"
+  ],
+  "env_vars": [
+    {
+      "name": "OPENARCHIEVEN_BASE_URL",
+      "effect": "Override API base URL (test use)"
+    },
+    {
+      "name": "OPENARCHIEVEN_OUTPUT",
+      "effect": "Default output format if --output not given"
+    },
+    {
+      "name": "OPENARCHIEVEN_RATE_LIMIT",
+      "effect": "Override 4 req/sec local limiter (test use)"
+    },
+    {
+      "name": "OPENARCHIEVEN_CACHE_DIR",
+      "effect": "Override cache directory"
+    },
+    {
+      "name": "OPENARCHIEVEN_CACHE_DISABLE",
+      "effect": "When 1, disable cache for the process"
+    },
+    {
+      "name": "NO_COLOR",
+      "effect": "Disable colored stderr output"
+    }
+  ],
+  "cache": {
+    "default_dir_template": "$XDG_CACHE_HOME/openarchieven (Linux), ~/Library/Caches/openarchieven (macOS)",
+    "file_permissions": "0600",
+    "dir_permissions": "0700"
+  },
+  "commands": [
+    {
+      "name": "search",
+      "description": "Free-text record search across all archives.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": true,
+      "cache_ttl_seconds": 21600,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--archive",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--source-type",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--event-place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--birth-place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--relation-type",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--country",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--sort",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 1,
+          "enum": [
+            -6,
+            -5,
+            -4,
+            -3,
+            -2,
+            -1,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 10,
+          "max": 100
+        },
+        {
+          "name": "--offset",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 0
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<record>"
+        },
+        {
+          "name": "total",
+          "type": "integer | null"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "offset",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "show",
+      "description": "Fetch a single record by archive code and identifier.",
+      "mutating": false,
+      "response_shape": "single-nested",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "archive",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "identifier",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en"
+          ]
+        }
+      ],
+      "output_fields": []
+    },
+    {
+      "name": "match",
+      "description": "Match a record by name and birth year (probabilistic linkage).",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 21600,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "birthyear",
+          "type": "integer",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<record>"
+        },
+        {
+          "name": "total",
+          "type": "integer | null"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "births",
+      "description": "Birth-event records by name with optional location/year filters.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": true,
+      "cache_ttl_seconds": 21600,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--event-year",
+          "type": "integer",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--event-place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--event-province",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 10,
+          "max": 100
+        },
+        {
+          "name": "--offset",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 0
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<record>"
+        },
+        {
+          "name": "total",
+          "type": "integer | null"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "offset",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "deaths",
+      "description": "Death-event records by name.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": true,
+      "cache_ttl_seconds": 21600,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--event-year",
+          "type": "integer",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--event-place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 10,
+          "max": 100
+        },
+        {
+          "name": "--offset",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 0
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<record>"
+        },
+        {
+          "name": "total",
+          "type": "integer | null"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "offset",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "marriages",
+      "description": "Marriage-event records by both partners' names.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": true,
+      "cache_ttl_seconds": 21600,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "name1",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "name2",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--event-year",
+          "type": "integer",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--event-place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 10,
+          "max": 100
+        },
+        {
+          "name": "--offset",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 0
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<record>"
+        },
+        {
+          "name": "total",
+          "type": "integer | null"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "offset",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "yearsago",
+      "description": "Records from N years ago today (date-dependent).",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "until_midnight",
+      "args": [
+        {
+          "name": "years",
+          "type": "integer",
+          "required": true,
+          "positional": true,
+          "min": 0
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 10,
+          "min": 1,
+          "max": 100
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<record>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "archives",
+      "description": "List all participating archives.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<archive>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "null"
+        },
+        {
+          "name": "offset",
+          "type": "null"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "census",
+      "description": "Census records by place or gg URI.",
+      "mutating": false,
+      "response_shape": "single-nested",
+      "paginated": false,
+      "cache_ttl_seconds": 2592000,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--year",
+          "type": "integer",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "--place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--gg-uri",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--province",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--richness",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1,
+          "max": 3,
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "output_fields": []
+    },
+    {
+      "name": "weather",
+      "description": "Historical weather observations for a date and coordinate.",
+      "mutating": false,
+      "response_shape": "single-nested",
+      "paginated": false,
+      "cache_ttl_seconds": 2592000,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--date",
+          "type": "string",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "--longitude",
+          "type": "number",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "--latitude",
+          "type": "number",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en"
+          ]
+        }
+      ],
+      "output_fields": []
+    },
+    {
+      "name": "stats records",
+      "description": "Per-archive record counts.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--archive",
+          "type": "string",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats sources",
+      "description": "Per-archive source-type counts.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--archive",
+          "type": "string",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats events",
+      "description": "Per-archive event-type counts.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--archive",
+          "type": "string",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats comments",
+      "description": "Per-archive comment counts.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--archive",
+          "type": "string",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats familynames",
+      "description": "Family-name frequency stats by place, year range, and event type.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--year-start",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1500,
+          "max": 1960
+        },
+        {
+          "name": "--year-end",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1500,
+          "max": 1960
+        },
+        {
+          "name": "--event-type",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "enum": [
+            0,
+            1,
+            2,
+            3,
+            6
+          ]
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 20,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de",
+            "fr"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats firstnames",
+      "description": "First-name frequency stats for a place and year.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--place",
+          "type": "string",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "--year",
+          "type": "integer",
+          "required": true,
+          "positional": false,
+          "min": 1600,
+          "max": 1960
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 20,
+          "min": 1,
+          "max": 100
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats professions",
+      "description": "Profession frequency stats by place and year range.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--year-start",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1500,
+          "max": 1960
+        },
+        {
+          "name": "--year-end",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1500,
+          "max": 1960
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 20,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de",
+            "fr"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<row>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "cache info",
+      "description": "Show cache location, total size, and entry count",
+      "mutating": false,
+      "response_shape": "single-flat",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "none",
+      "args": [],
+      "output_fields": [
+        {
+          "name": "root",
+          "type": "string"
+        },
+        {
+          "name": "entries",
+          "type": "integer"
+        },
+        {
+          "name": "bytes",
+          "type": "integer"
+        },
+        {
+          "name": "oldest",
+          "type": "datetime | null"
+        },
+        {
+          "name": "newest",
+          "type": "datetime | null"
+        }
+      ]
+    },
+    {
+      "name": "cache clear",
+      "description": "Delete all cache entries (requires --yes)",
+      "mutating": true,
+      "response_shape": "single-flat",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "none",
+      "args": [
+        {
+          "name": "--yes",
+          "type": "boolean",
+          "required": true,
+          "positional": false
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "deleted",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "name": "cache prune",
+      "description": "Delete only expired cache entries",
+      "mutating": true,
+      "response_shape": "single-flat",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "none",
+      "args": [],
+      "output_fields": [
+        {
+          "name": "deleted",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "name": "schema",
+      "description": "Emit this machine-readable schema document",
+      "mutating": false,
+      "response_shape": "schema",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "none",
+      "args": [],
+      "output_fields": []
+    },
+    {
+      "name": "version",
+      "description": "Print the binary version",
+      "mutating": false,
+      "response_shape": "single-flat",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "none",
+      "args": [],
+      "output_fields": [
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "kind": "validation",
+      "retryable": false,
+      "exit_code": 2,
+      "fields": [
+        "kind",
+        "message",
+        "upstream_code",
+        "upstream_message"
+      ]
+    },
+    {
+      "kind": "not_found",
+      "retryable": false,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    },
+    {
+      "kind": "rate_limit",
+      "retryable": true,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message",
+        "retry_after_seconds"
+      ]
+    },
+    {
+      "kind": "timeout",
+      "retryable": true,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    },
+    {
+      "kind": "network",
+      "retryable": true,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    },
+    {
+      "kind": "io",
+      "retryable": false,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    },
+    {
+      "kind": "server",
+      "retryable": true,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    },
+    {
+      "kind": "parse",
+      "retryable": false,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    },
+    {
+      "kind": "conflict",
+      "retryable": false,
+      "exit_code": 1,
+      "fields": [
+        "kind",
+        "message"
+      ]
+    }
+  ]
+}
