@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use reqwest::blocking::Client as HttpClient;
 use url::Url;
 
 use crate::error::{Error, ErrorKind, Result};
@@ -27,22 +26,12 @@ impl Default for ClientConfig {
 }
 
 pub struct Client {
-    // Held for use in Task 1.10+ (get/retry/rate-limit).
-    _http: HttpClient,
     config: ClientConfig,
 }
 
 impl Client {
     pub fn new(config: ClientConfig) -> Result<Self> {
-        let http = HttpClient::builder()
-            .user_agent(USER_AGENT)
-            .timeout(config.timeout)
-            .build()
-            .map_err(|e| Error::new(ErrorKind::Network, e.to_string()))?;
-        Ok(Self {
-            _http: http,
-            config,
-        })
+        Ok(Self { config })
     }
 
     pub fn config(&self) -> &ClientConfig {
