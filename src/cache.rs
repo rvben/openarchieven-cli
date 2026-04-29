@@ -134,8 +134,10 @@ impl Cache {
                 fs::create_dir_all(&root).map_err(|e| {
                     Error::new(ErrorKind::Validation, format!("create cache-dir: {e}"))
                 })?;
-                set_dir_private(&root);
             }
+            // Always tighten permissions on the cache root: genealogical query
+            // responses are private to the user.
+            set_dir_private(&root);
         }
         Ok(Self { root, disabled })
     }
@@ -369,11 +371,50 @@ mod store_tests {
     }
 
     #[test]
-    fn until_midnight_expires_after_next_midnight() {
+    fn until_midnight_expires_at_next_calendar_midnight() {
         let now = Utc::now();
         let exp = Ttl::UntilMidnight.expires_at(now).unwrap();
-        assert!(exp > now);
-        assert!(exp - now <= chrono::Duration::hours(48));
+        assert_eq!(
+            exp.time(),
+            chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()
+        );
+        assert_eq!(
+            exp.date_naive(),
+            (now + chrono::Duration::days(1)).date_naive()
+        );
+    }
+
+    #[test]
+    fn is_expired_at_exact_boundary() {
+        let now = Utc::now();
+        let e = Entry {
+            url: "u".into(),
+            fetched_at: now,
+            expires_at: Some(now),
+            body: serde_json::json!({}),
+        };
+        assert!(e.is_expired(now));
+    }
+
+    #[test]
+    fn put_overwrites_existing_key() {
+        let dir = td();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let now = Utc::now();
+        let mut e = entry(now, Ttl::Fixed(Duration::from_secs(60)));
+        cache.put("abc", &e);
+        e.body = json!({"a": 2});
+        cache.put("abc", &e);
+        assert_eq!(cache.get("abc", now).unwrap().body, json!({"a": 2}));
+    }
+
+    #[test]
+    fn rejects_regular_file_as_root() {
+        let dir = td();
+        let path = dir.path().join("not-a-dir");
+        std::fs::write(&path, b"hello").unwrap();
+        let err = Cache::open(path, false).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::Validation);
     }
 
     #[test]
