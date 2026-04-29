@@ -110,19 +110,38 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::stats::professions::run(client, cache, ctx, &parsed)
             })
         }
-        Cmd::Cache(CacheCmd::Info) => Err(Error::new(
-            ErrorKind::Validation,
-            "cache info: not yet implemented",
-        )),
-        Cmd::Cache(CacheCmd::Clear { .. }) => Err(Error::new(
-            ErrorKind::Validation,
-            "cache clear: not yet implemented",
-        )),
-        Cmd::Cache(CacheCmd::Prune) => Err(Error::new(
-            ErrorKind::Validation,
-            "cache prune: not yet implemented",
-        )),
+        Cmd::Cache(CacheCmd::Info) => run_cache_op(&global, |cache| {
+            openarchieven::commands::cache_cmd::info(cache)
+        }),
+        Cmd::Cache(CacheCmd::Clear { yes }) => run_cache_op(&global, move |cache| {
+            openarchieven::commands::cache_cmd::clear(cache, yes)
+        }),
+        Cmd::Cache(CacheCmd::Prune) => run_cache_op(&global, |cache| {
+            openarchieven::commands::cache_cmd::prune(cache)
+        }),
     }
+}
+
+fn run_cache_op<F>(global: &openarchieven::runtime::GlobalArgs, f: F) -> Result<(), Error>
+where
+    F: FnOnce(&openarchieven::cache::Cache) -> Result<openarchieven::output::Renderable, Error>,
+{
+    let dir = openarchieven::runtime::default_cache_dir().ok_or_else(|| {
+        Error::new(
+            ErrorKind::Validation,
+            "could not determine cache directory; set OPENARCHIEVEN_CACHE_DIR",
+        )
+    })?;
+    let cache = openarchieven::cache::Cache::open(dir, false)?;
+    let renderable = f(&cache)?;
+    openarchieven::output::render(
+        &mut std::io::stdout().lock(),
+        &renderable,
+        global.format,
+        false,
+    )
+    .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?;
+    Ok(())
 }
 
 fn run_endpoint<F>(

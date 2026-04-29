@@ -1,4 +1,37 @@
+use chrono::Utc;
+use serde_json::json;
+
+use crate::cache::Cache;
+use crate::error::{Error, ErrorKind, Result};
+use crate::output::Renderable;
 use crate::schema_cmd::{Arg, Command, OutputField};
+
+pub fn info(cache: &Cache) -> Result<Renderable> {
+    let snap = cache.info()?;
+    Ok(Renderable::single_flat(json!({
+        "root": snap.root.display().to_string(),
+        "entries": snap.entries,
+        "bytes": snap.bytes,
+        "oldest": snap.oldest.map(|t| t.to_rfc3339()),
+        "newest": snap.newest.map(|t| t.to_rfc3339()),
+    })))
+}
+
+pub fn clear(cache: &Cache, yes: bool) -> Result<Renderable> {
+    if !yes {
+        return Err(Error::new(
+            ErrorKind::Validation,
+            "`cache clear` requires --yes; this is a destructive operation",
+        ));
+    }
+    let deleted = cache.clear()?;
+    Ok(Renderable::single_flat(json!({ "deleted": deleted })))
+}
+
+pub fn prune(cache: &Cache) -> Result<Renderable> {
+    let deleted = cache.prune(Utc::now())?;
+    Ok(Renderable::single_flat(json!({ "deleted": deleted })))
+}
 
 pub fn info_schema() -> Command {
     Command {

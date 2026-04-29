@@ -150,7 +150,7 @@ pub fn build_cache(api: &ApiContext) -> Result<Option<Cache>> {
     Cache::open(dir, false).map(Some)
 }
 
-fn default_cache_dir() -> Option<PathBuf> {
+pub fn default_cache_dir() -> Option<PathBuf> {
     directories::ProjectDirs::from("", "", "openarchieven").map(|p| p.cache_dir().to_path_buf())
 }
 
