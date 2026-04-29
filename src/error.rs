@@ -101,6 +101,10 @@ impl Error {
         self.retry_after_seconds
     }
 
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
     pub fn is_retryable_transport(&self) -> bool {
         self.kind.retryable()
     }
