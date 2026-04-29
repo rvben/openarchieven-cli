@@ -100,6 +100,10 @@ impl Error {
     pub fn retry_after_seconds(&self) -> Option<u64> {
         self.retry_after_seconds
     }
+
+    pub fn is_retryable_transport(&self) -> bool {
+        self.kind.retryable()
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

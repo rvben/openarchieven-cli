@@ -1,5 +1,7 @@
 use std::num::NonZeroU32;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use rand::Rng;
 
 use governor::clock::{Clock, DefaultClock};
 use governor::middleware::NoOpMiddleware;
@@ -14,6 +16,10 @@ use crate::error::{Error, ErrorKind, Result};
 pub const DEFAULT_BASE_URL: &str = "https://api.openarchieven.nl/1.1";
 pub const ENV_BASE_URL: &str = "OPENARCHIEVEN_BASE_URL";
 pub const USER_AGENT: &str = concat!("openarchieven/", env!("CARGO_PKG_VERSION"));
+
+const MAX_ATTEMPTS: u32 = 3;
+const BASE_BACKOFF_MS: u64 = 500;
+const MAX_BACKOFF_MS: u64 = 5_000;
 
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock, NoOpMiddleware>;
 
@@ -134,6 +140,55 @@ impl Client {
 
         Err(map_error_status(status, &body_bytes, retry_after))
     }
+}
+
+impl Client {
+    /// Execute a request with retry, jittered exponential backoff, and an
+    /// overall deadline derived from the configured timeout. Retries on
+    /// transient errors (429, 5xx, network, timeout). Non-retryable errors
+    /// (4xx validation, not-found, parse) are surfaced immediately.
+    pub fn get(&self, path: &str, params: &[(&str, &str)]) -> Result<Value> {
+        let deadline = Instant::now() + self.config.timeout;
+        let mut last: Option<Error> = None;
+        for attempt in 0..MAX_ATTEMPTS {
+            if Instant::now() >= deadline {
+                return Err(Error::new(ErrorKind::Timeout, "deadline exceeded"));
+            }
+            match self.execute_once(path, params) {
+                Ok(v) => return Ok(v),
+                Err(e) => {
+                    if !e.is_retryable_transport() {
+                        return Err(e);
+                    }
+                    let is_last = attempt + 1 == MAX_ATTEMPTS;
+                    if is_last {
+                        last = Some(e);
+                        break;
+                    }
+                    let wait = backoff(attempt, e.retry_after_seconds());
+                    last = Some(e);
+                    let now = Instant::now();
+                    let remaining = deadline.saturating_duration_since(now);
+                    if remaining.is_zero() {
+                        return Err(Error::new(ErrorKind::Timeout, "deadline exceeded"));
+                    }
+                    std::thread::sleep(wait.min(remaining));
+                }
+            }
+        }
+        Err(last.expect("at least one attempt failed before reaching the loop end"))
+    }
+}
+
+fn backoff(attempt: u32, retry_after: Option<u64>) -> Duration {
+    if let Some(secs) = retry_after {
+        return Duration::from_secs(secs).min(Duration::from_millis(MAX_BACKOFF_MS));
+    }
+    let cap = BASE_BACKOFF_MS
+        .saturating_mul(1u64 << attempt)
+        .min(MAX_BACKOFF_MS);
+    let jittered = rand::rng().random_range(0..=cap);
+    Duration::from_millis(jittered)
 }
 
 fn map_error_status(status: reqwest::StatusCode, body: &[u8], retry_after: Option<u64>) -> Error {
