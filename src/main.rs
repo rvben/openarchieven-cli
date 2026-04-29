@@ -98,6 +98,18 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::stats::familynames::run(client, cache, ctx, &parsed)
             })
         }
+        Cmd::Stats(StatsCmd::Firstnames(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::firstnames::parse_rest(rest)?;
+                openarchieven::commands::stats::firstnames::run(client, cache, ctx, &parsed)
+            })
+        }
+        Cmd::Stats(StatsCmd::Professions(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::professions::parse_rest(rest)?;
+                openarchieven::commands::stats::professions::run(client, cache, ctx, &parsed)
+            })
+        }
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
             "cache info: not yet implemented",
@@ -109,10 +121,6 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
         Cmd::Cache(CacheCmd::Prune) => Err(Error::new(
             ErrorKind::Validation,
             "cache prune: not yet implemented",
-        )),
-        _ => Err(Error::new(
-            ErrorKind::Validation,
-            "command not yet implemented",
         )),
     }
 }
