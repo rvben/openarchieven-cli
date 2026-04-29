@@ -68,7 +68,12 @@ impl Renderable {
 
     /// For `List`: build the wrapper `{items, total, limit, offset, paginated}`.
     pub fn list_envelope(&self, total_override: Option<u64>) -> Value {
-        debug_assert_eq!(self.shape, Shape::List);
+        assert_eq!(
+            self.shape,
+            Shape::List,
+            "list_envelope called on {:?}",
+            self.shape
+        );
         let arr = self.body.as_array().cloned().unwrap_or_default();
         let total = total_override
             .map(|n| json!(n))
@@ -149,14 +154,22 @@ pub fn render<W: Write>(
 }
 
 fn render_json<W: Write>(out: &mut W, r: &Renderable, pretty: bool) -> std::io::Result<()> {
-    let v = match r.shape {
-        Shape::List => r.list_envelope(None),
-        _ => r.body.clone(),
-    };
-    if pretty {
-        serde_json::to_writer_pretty(&mut *out, &v)?;
-    } else {
-        serde_json::to_writer(&mut *out, &v)?;
+    match r.shape {
+        Shape::List => {
+            let envelope = r.list_envelope(None);
+            if pretty {
+                serde_json::to_writer_pretty(&mut *out, &envelope)?;
+            } else {
+                serde_json::to_writer(&mut *out, &envelope)?;
+            }
+        }
+        _ => {
+            if pretty {
+                serde_json::to_writer_pretty(&mut *out, &r.body)?;
+            } else {
+                serde_json::to_writer(&mut *out, &r.body)?;
+            }
+        }
     }
     writeln!(out)
 }
