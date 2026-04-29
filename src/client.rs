@@ -1,5 +1,11 @@
+use std::num::NonZeroU32;
+use std::sync::Arc;
 use std::time::Duration;
 
+use governor::clock::{Clock, DefaultClock};
+use governor::middleware::NoOpMiddleware;
+use governor::state::{InMemoryState, NotKeyed};
+use governor::{Quota, RateLimiter};
 use url::Url;
 
 use crate::error::{Error, ErrorKind, Result};
@@ -8,11 +14,14 @@ pub const DEFAULT_BASE_URL: &str = "https://api.openarchieven.nl/1.1";
 pub const ENV_BASE_URL: &str = "OPENARCHIEVEN_BASE_URL";
 pub const USER_AGENT: &str = concat!("openarchieven/", env!("CARGO_PKG_VERSION"));
 
+type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock, NoOpMiddleware>;
+
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
     pub base_url: String,
     pub timeout: Duration,
     pub lang: String,
+    pub rate_limit_per_sec: u32,
 }
 
 impl Default for ClientConfig {
@@ -21,17 +30,41 @@ impl Default for ClientConfig {
             base_url: DEFAULT_BASE_URL.to_string(),
             timeout: Duration::from_secs(30),
             lang: "nl".to_string(),
+            rate_limit_per_sec: 4,
         }
     }
 }
 
 pub struct Client {
     config: ClientConfig,
+    limiter: Arc<Limiter>,
 }
 
 impl Client {
     pub fn new(config: ClientConfig) -> Result<Self> {
-        Ok(Self { config })
+        let qps =
+            NonZeroU32::new(config.rate_limit_per_sec.max(1)).expect("rate_limit_per_sec >= 1");
+        let limiter = Arc::new(RateLimiter::direct(Quota::per_second(qps)));
+        Ok(Self { config, limiter })
+    }
+
+    /// Block (synchronously) until a rate-limit token is available.
+    pub fn acquire(&self) {
+        loop {
+            match self.limiter.check() {
+                Ok(_) => return,
+                Err(not_until) => {
+                    let now = DefaultClock::default().now();
+                    let wait = not_until.wait_time_from(now);
+                    std::thread::sleep(wait);
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn acquire_for_test(&self) {
+        self.acquire();
     }
 
     pub fn config(&self) -> &ClientConfig {
@@ -139,6 +172,37 @@ mod tests {
         assert_eq!(
             resolve_base_url(Some("https://api.example.com/v1/")),
             "https://api.example.com/v1"
+        );
+    }
+
+    #[test]
+    fn rate_limiter_admits_first_token_immediately() {
+        let cfg = ClientConfig {
+            rate_limit_per_sec: 4,
+            ..ClientConfig::default()
+        };
+        let client = Client::new(cfg).unwrap();
+        let start = std::time::Instant::now();
+        client.acquire_for_test();
+        assert!(start.elapsed() < std::time::Duration::from_millis(50));
+    }
+
+    #[test]
+    fn rate_limiter_throttles_burst() {
+        // 2 req/sec → 5 requests should take at least ~1.5s (3 of them throttled).
+        let cfg = ClientConfig {
+            rate_limit_per_sec: 2,
+            ..ClientConfig::default()
+        };
+        let client = Client::new(cfg).unwrap();
+        let start = std::time::Instant::now();
+        for _ in 0..5 {
+            client.acquire_for_test();
+        }
+        assert!(
+            start.elapsed() >= std::time::Duration::from_millis(1500),
+            "expected throttling, took {:?}",
+            start.elapsed()
         );
     }
 }
