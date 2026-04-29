@@ -1,6 +1,6 @@
 .PHONY: check build test lint fmt install \
         release-patch release-minor release-major \
-        release-build release-archive \
+        release-build release-archive homebrew-formula \
         test-live clean
 
 check: lint test
@@ -47,6 +47,14 @@ release-archive:
 	mkdir -p dist
 	tar -C target/$(TARGET)/release -czf dist/openarchieven-$(VERSION)-$(TARGET).tar.gz openarchieven
 	cd dist && shasum -a 256 openarchieven-$(VERSION)-$(TARGET).tar.gz > openarchieven-$(VERSION)-$(TARGET).tar.gz.sha256
+
+# Render the Homebrew formula from the .sha256 sidecar files in dist/.
+# All four supported targets must already have an archive present.
+# e.g. make homebrew-formula VERSION=0.1.0 TAG=v0.1.0
+homebrew-formula:
+	@if [ -z "$(VERSION)" ]; then echo "VERSION is required"; exit 1; fi
+	@if [ -z "$(TAG)" ]; then echo "TAG is required"; exit 1; fi
+	./scripts/render-homebrew-formula.sh $(VERSION) $(TAG) > dist/openarchieven.rb
 
 test-live:
 	OPENARCHIEVEN_TEST_LIVE=1 cargo test --test live -- --nocapture
