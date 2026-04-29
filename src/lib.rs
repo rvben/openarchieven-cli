@@ -3,6 +3,7 @@
 //! Public entry point is [`run`], which reads `std::env::args` and writes to
 //! stdout/stderr.
 
+pub mod cache;
 pub mod error;
 pub mod output;
 pub mod tty;

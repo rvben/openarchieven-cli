@@ -35,6 +35,7 @@ sha2 = "0.10"
 tempfile = "3"
 thiserror = "2"
 url = "2"
+urlencoding = "2"
 
 [dev-dependencies]
 assert_cmd = "2"
