@@ -115,34 +115,40 @@ pub struct Cache {
 impl Cache {
     /// Open (or create) a cache rooted at `root`. `root` must be a real
     /// directory (or non-existent — it will be created with `0700`). Symlinked
-    /// roots are rejected.
+    /// roots are rejected. The stored root is canonicalized so subsequent
+    /// path comparisons are stable regardless of how the user spelled it.
     pub fn open(root: PathBuf, disabled: bool) -> Result<Self> {
-        if !disabled {
-            if root.exists() {
-                let meta = fs::symlink_metadata(&root).map_err(|e| {
-                    Error::new(ErrorKind::Validation, format!("cache-dir stat: {e}"))
-                })?;
-                if meta.file_type().is_symlink() {
-                    return Err(Error::new(
-                        ErrorKind::Validation,
-                        format!("cache-dir is a symlink: {}", root.display()),
-                    ));
-                }
-                if !meta.is_dir() {
-                    return Err(Error::new(
-                        ErrorKind::Validation,
-                        format!("cache-dir is not a directory: {}", root.display()),
-                    ));
-                }
-            } else {
-                fs::create_dir_all(&root).map_err(|e| {
-                    Error::new(ErrorKind::Validation, format!("create cache-dir: {e}"))
-                })?;
-            }
-            // Always tighten permissions on the cache root: genealogical query
-            // responses are private to the user.
-            set_dir_private(&root);
+        if disabled {
+            return Ok(Self { root, disabled });
         }
+        if root.exists() {
+            let meta = fs::symlink_metadata(&root)
+                .map_err(|e| Error::new(ErrorKind::Validation, format!("cache-dir stat: {e}")))?;
+            if meta.file_type().is_symlink() {
+                return Err(Error::new(
+                    ErrorKind::Validation,
+                    format!("cache-dir is a symlink: {}", root.display()),
+                ));
+            }
+            if !meta.is_dir() {
+                return Err(Error::new(
+                    ErrorKind::Validation,
+                    format!("cache-dir is not a directory: {}", root.display()),
+                ));
+            }
+        } else {
+            fs::create_dir_all(&root)
+                .map_err(|e| Error::new(ErrorKind::Validation, format!("create cache-dir: {e}")))?;
+        }
+        // Always tighten permissions on the cache root: genealogical query
+        // responses are private to the user.
+        set_dir_private(&root);
+        let root = fs::canonicalize(&root).map_err(|e| {
+            Error::new(
+                ErrorKind::Validation,
+                format!("canonicalize cache-dir: {e}"),
+            )
+        })?;
         Ok(Self { root, disabled })
     }
 

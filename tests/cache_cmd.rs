@@ -35,7 +35,11 @@ fn info_reports_zero_entries_for_fresh_dir() {
     assert_eq!(r.body["bytes"], json!(0));
     assert_eq!(r.body["oldest"], json!(null));
     assert_eq!(r.body["newest"], json!(null));
-    assert_eq!(r.body["root"], json!(dir.path().display().to_string()));
+    let expected_root = std::fs::canonicalize(dir.path())
+        .unwrap()
+        .display()
+        .to_string();
+    assert_eq!(r.body["root"], json!(expected_root));
 }
 
 #[test]
