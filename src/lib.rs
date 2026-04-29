@@ -3,6 +3,8 @@
 //! Public entry point is [`run`], which reads `std::env::args` and writes to
 //! stdout/stderr.
 
+pub mod error;
+
 use std::process::ExitCode;
 
 pub fn run() -> ExitCode {
