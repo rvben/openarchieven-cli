@@ -1,19 +1,45 @@
+use std::io::{IsTerminal, Write};
 use std::process::ExitCode;
 
 use clap::Parser;
+use clap::error::ErrorKind as ClapErrorKind;
 
 use openarchieven::cli::{ApiArgs, CacheCmd, Cli, Cmd, StatsCmd};
 use openarchieven::error::{Error, ErrorKind, emit_json};
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
-    match dispatch(cli) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(err) => {
-            let _ = emit_json(&mut std::io::stderr().lock(), &err);
+    match Cli::try_parse() {
+        Ok(cli) => match dispatch(cli) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                emit_error(&err);
+                ExitCode::from(err.kind().exit_code())
+            }
+        },
+        Err(clap_err) => {
+            // `--help` and `--version` are not errors — let clap render them
+            // to stdout and exit 0.
+            if matches!(
+                clap_err.kind(),
+                ClapErrorKind::DisplayHelp | ClapErrorKind::DisplayVersion
+            ) {
+                let _ = clap_err.print();
+                return ExitCode::SUCCESS;
+            }
+            let err = Error::new(ErrorKind::Validation, clap_err.to_string());
+            emit_error(&err);
             ExitCode::from(err.kind().exit_code())
         }
     }
+}
+
+fn emit_error(err: &Error) {
+    let mut stderr = std::io::stderr().lock();
+    let no_color = std::env::var_os("NO_COLOR").is_some();
+    if std::io::stderr().is_terminal() && !no_color {
+        let _ = writeln!(stderr, "error[{}]: {}", err.kind(), err.message());
+    }
+    let _ = emit_json(&mut stderr, err);
 }
 
 fn dispatch(cli: Cli) -> Result<(), Error> {

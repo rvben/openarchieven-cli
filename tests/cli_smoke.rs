@@ -30,7 +30,12 @@ fn version_command_prints_version() {
 fn unknown_command_is_validation_error() {
     let out = bin().arg("nope").assert().failure();
     let stderr = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
-    assert!(stderr.contains("nope") || stderr.contains("error"));
+    let last = stderr.lines().last().expect("stderr must have a line");
+    let v: serde_json::Value =
+        serde_json::from_str(last).expect("last stderr line must be valid JSON");
+    assert_eq!(v["error"]["kind"], "validation");
+    assert_eq!(v["error"]["retryable"], false);
+    assert_eq!(out.get_output().status.code(), Some(2));
 }
 
 #[test]
@@ -79,4 +84,36 @@ fn env_var_overrides_pipe_default() {
         stdout.contains("- **entries**:"),
         "expected markdown bullet, got: {stdout}"
     );
+}
+
+#[test]
+fn cache_clear_without_yes_emits_validation_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = bin()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .args(["cache", "clear"])
+        .assert()
+        .failure();
+    let stderr = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    let last = stderr.lines().last().expect("stderr must have a line");
+    let v: serde_json::Value =
+        serde_json::from_str(last).expect("last stderr line must be valid JSON");
+    assert_eq!(v["error"]["kind"], "validation");
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("--yes"),
+        "got message: {:?}",
+        v["error"]["message"]
+    );
+}
+
+#[test]
+fn missing_required_arg_emits_validation_json() {
+    // `show` requires a positional <id>. clap rejects, we wrap as validation.
+    let out = bin().arg("show").assert().failure();
+    let stderr = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    let last = stderr.lines().last().expect("stderr must have a line");
+    let v: serde_json::Value =
+        serde_json::from_str(last).expect("last stderr line must be valid JSON");
+    assert_eq!(v["error"]["kind"], "validation");
+    assert_eq!(out.get_output().status.code(), Some(2));
 }
