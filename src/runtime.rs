@@ -7,7 +7,7 @@ use crate::cache::Cache;
 use crate::cli::{ApiArgs, Cli, FormatArg};
 use crate::client::{CacheMode, Client, ClientConfig, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
-use crate::tty::{Format, Stream, is_tty};
+use crate::tty::{Format, Stream, is_tty, resolve_format};
 
 #[derive(Debug, Clone)]
 pub struct GlobalArgs {
@@ -37,31 +37,15 @@ pub enum TtlOverride {
 
 impl GlobalArgs {
     pub fn from_cli(cli: &Cli) -> Self {
-        let env_fmt = std::env::var("OPENARCHIEVEN_OUTPUT").ok().and_then(|s| {
-            match s.to_ascii_lowercase().as_str() {
-                "json" => Some(FormatArg::Json),
-                "table" => Some(FormatArg::Table),
-                "markdown" => Some(FormatArg::Markdown),
-                _ => None,
-            }
+        let explicit = cli.output.map(|f| match f {
+            FormatArg::Json => Format::Json,
+            FormatArg::Table => Format::Table,
+            FormatArg::Markdown => Format::Markdown,
         });
-        let resolved = cli
-            .output
-            .or(env_fmt)
-            .map(|f| match f {
-                FormatArg::Json => Format::Json,
-                FormatArg::Table => Format::Table,
-                FormatArg::Markdown => Format::Markdown,
-            })
-            .unwrap_or_else(|| {
-                if is_tty(Stream::Stdout) {
-                    Format::Table
-                } else {
-                    Format::Json
-                }
-            });
+        let env = std::env::var("OPENARCHIEVEN_OUTPUT").ok();
+        let format = resolve_format(explicit, env.as_deref(), is_tty(Stream::Stdout));
         Self {
-            format: resolved,
+            format,
             quiet: cli.quiet,
             no_color: cli.no_color || std::env::var_os("NO_COLOR").is_some(),
         }

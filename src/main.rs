@@ -126,12 +126,15 @@ fn run_cache_op<F>(global: &openarchieven::runtime::GlobalArgs, f: F) -> Result<
 where
     F: FnOnce(&openarchieven::cache::Cache) -> Result<openarchieven::output::Renderable, Error>,
 {
-    let dir = openarchieven::runtime::default_cache_dir().ok_or_else(|| {
-        Error::new(
-            ErrorKind::Validation,
-            "could not determine cache directory; set OPENARCHIEVEN_CACHE_DIR",
-        )
-    })?;
+    let dir = std::env::var_os("OPENARCHIEVEN_CACHE_DIR")
+        .map(std::path::PathBuf::from)
+        .or_else(openarchieven::runtime::default_cache_dir)
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::Validation,
+                "could not determine cache directory; set OPENARCHIEVEN_CACHE_DIR",
+            )
+        })?;
     let cache = openarchieven::cache::Cache::open(dir, false)?;
     let renderable = f(&cache)?;
     openarchieven::output::render(
