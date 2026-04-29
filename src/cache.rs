@@ -19,6 +19,10 @@ pub fn key(
     params: &BTreeMap<String, String>,
     ttl_class: &str,
 ) -> String {
+    debug_assert!(
+        !method.contains('\0') && !path.contains('\0') && !ttl_class.contains('\0'),
+        "key() inputs must not contain NUL bytes (would collide with field separator)"
+    );
     let canonical_base = canonical_base_url(base_url);
     let q = params
         .iter()
@@ -75,6 +79,13 @@ mod tests {
     }
 
     #[test]
+    fn key_changes_with_method() {
+        let a = key("https://example.com", "GET", "/x", &p(&[]), "");
+        let b = key("https://example.com", "POST", "/x", &p(&[]), "");
+        assert_ne!(a, b);
+    }
+
+    #[test]
     fn key_changes_with_ttl_class() {
         let a = key("https://example.com", "GET", "/x", &p(&[]), "2026-04-29");
         let b = key("https://example.com", "GET", "/x", &p(&[]), "2026-04-30");
@@ -117,6 +128,20 @@ mod tests {
             "",
         );
         let b = key("https://api.openarchieven.nl/1.1", "GET", "/x", &p(&[]), "");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn key_normalizes_default_port() {
+        let a = key("https://example.com:443/1.1", "GET", "/x", &p(&[]), "");
+        let b = key("https://example.com/1.1", "GET", "/x", &p(&[]), "");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn key_invalid_url_falls_back_to_trailing_slash_strip() {
+        let a = key("not-a-url/", "GET", "/x", &p(&[]), "");
+        let b = key("not-a-url", "GET", "/x", &p(&[]), "");
         assert_eq!(a, b);
     }
 
