@@ -160,12 +160,6 @@ fn errors() -> Vec<ErrorEntry> {
             fields: vec!["kind", "message"],
         },
         ErrorEntry {
-            kind: "io",
-            retryable: false,
-            exit_code: 1,
-            fields: vec!["kind", "message"],
-        },
-        ErrorEntry {
             kind: "server",
             retryable: true,
             exit_code: 1,
@@ -249,8 +243,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn errors_block_lists_nine_kinds() {
-        assert_eq!(errors().len(), 9);
+    fn errors_block_lists_eight_kinds() {
+        assert_eq!(errors().len(), 8);
     }
 
     #[test]

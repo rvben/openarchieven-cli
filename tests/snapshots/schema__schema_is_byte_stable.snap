@@ -1110,15 +1110,6 @@ expression: s
       ]
     },
     {
-      "kind": "io",
-      "retryable": false,
-      "exit_code": 1,
-      "fields": [
-        "kind",
-        "message"
-      ]
-    },
-    {
       "kind": "server",
       "retryable": true,
       "exit_code": 1,

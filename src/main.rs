@@ -9,13 +9,16 @@ use openarchieven::error::{Error, ErrorKind, emit_json};
 
 fn main() -> ExitCode {
     match Cli::try_parse() {
-        Ok(cli) => match dispatch(cli) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(err) => {
-                emit_error(&err);
-                ExitCode::from(err.kind().exit_code())
+        Ok(cli) => {
+            let no_color = cli.no_color || std::env::var_os("NO_COLOR").is_some();
+            match dispatch(cli) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(err) => {
+                    emit_error(&err, no_color);
+                    ExitCode::from(err.kind().exit_code())
+                }
             }
-        },
+        }
         Err(clap_err) => {
             // `--help` and `--version` are not errors — let clap render them
             // to stdout and exit 0.
@@ -26,34 +29,52 @@ fn main() -> ExitCode {
                 let _ = clap_err.print();
                 return ExitCode::SUCCESS;
             }
+            let no_color = std::env::var_os("NO_COLOR").is_some();
             let err = Error::new(ErrorKind::Validation, clap_err.to_string());
-            emit_error(&err);
+            emit_error(&err, no_color);
             ExitCode::from(err.kind().exit_code())
         }
     }
 }
 
-fn emit_error(err: &Error) {
+fn emit_error(err: &Error, no_color: bool) {
     let mut stderr = std::io::stderr().lock();
-    let no_color = std::env::var_os("NO_COLOR").is_some();
     if std::io::stderr().is_terminal() && !no_color {
         let _ = writeln!(stderr, "error[{}]: {}", err.kind(), err.message());
     }
     let _ = emit_json(&mut stderr, err);
 }
 
+/// Render to stdout, treating broken pipe (downstream `head`/`less`/etc.
+/// closing early) as a clean exit. Other I/O failures here mean stdout is
+/// hosed and we panic — there's nothing useful we could write next.
+fn write_stdout(
+    f: impl FnOnce(&mut std::io::StdoutLock<'_>) -> std::io::Result<()>,
+) -> Result<(), Error> {
+    let stdout = std::io::stdout();
+    let mut handle = stdout.lock();
+    match f(&mut handle) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(e) => panic!("stdout write failed: {e}"),
+    }
+}
+
 fn dispatch(cli: Cli) -> Result<(), Error> {
     let global = openarchieven::runtime::GlobalArgs::from_cli(&cli);
     match cli.command {
         Cmd::Version => {
-            println!("openarchieven {}", env!("CARGO_PKG_VERSION"));
-            Ok(())
+            let body = serde_json::json!({ "version": env!("CARGO_PKG_VERSION") });
+            let renderable = openarchieven::output::Renderable::single_flat(body);
+            let pretty = std::io::stdout().is_terminal();
+            write_stdout(|out| {
+                openarchieven::output::render(out, &renderable, global.format, pretty)
+            })
         }
         Cmd::Schema => {
             let schema = openarchieven::schema_cmd::build();
             let json = serde_json::to_string_pretty(&schema).expect("schema always serializes");
-            println!("{json}");
-            Ok(())
+            write_stdout(|out| writeln!(out, "{json}"))
         }
         Cmd::Archives(args) => run_endpoint(args, &global, |client, cache, ctx, _rest| {
             openarchieven::commands::archives::run(client, cache, ctx)
@@ -163,14 +184,8 @@ where
         })?;
     let cache = openarchieven::cache::Cache::open(dir, false)?;
     let renderable = f(&cache)?;
-    openarchieven::output::render(
-        &mut std::io::stdout().lock(),
-        &renderable,
-        global.format,
-        false,
-    )
-    .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?;
-    Ok(())
+    let pretty = std::io::stdout().is_terminal();
+    write_stdout(|out| openarchieven::output::render(out, &renderable, global.format, pretty))
 }
 
 fn run_endpoint<F>(
@@ -194,12 +209,6 @@ where
     if let Some(fields) = ctx.fields.as_deref() {
         renderable = openarchieven::output::apply_fields_auto(renderable, fields)?;
     }
-    openarchieven::output::render(
-        &mut std::io::stdout().lock(),
-        &renderable,
-        global.format,
-        false,
-    )
-    .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?;
-    Ok(())
+    let pretty = std::io::stdout().is_terminal();
+    write_stdout(|out| openarchieven::output::render(out, &renderable, global.format, pretty))
 }

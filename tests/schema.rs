@@ -59,7 +59,6 @@ fn schema_error_kinds_match_runtime_enum() {
             "rate_limit",
             "timeout",
             "network",
-            "io",
             "server",
             "parse",
             "conflict",
