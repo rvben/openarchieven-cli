@@ -1,5 +1,4 @@
 use std::num::NonZeroU32;
-use std::sync::Arc;
 use std::time::Duration;
 
 use governor::clock::{Clock, DefaultClock};
@@ -37,15 +36,20 @@ impl Default for ClientConfig {
 
 pub struct Client {
     config: ClientConfig,
-    limiter: Arc<Limiter>,
+    limiter: Limiter,
+    clock: DefaultClock,
 }
 
 impl Client {
     pub fn new(config: ClientConfig) -> Result<Self> {
         let qps =
             NonZeroU32::new(config.rate_limit_per_sec.max(1)).expect("rate_limit_per_sec >= 1");
-        let limiter = Arc::new(RateLimiter::direct(Quota::per_second(qps)));
-        Ok(Self { config, limiter })
+        let limiter = RateLimiter::direct(Quota::per_second(qps));
+        Ok(Self {
+            config,
+            limiter,
+            clock: DefaultClock::default(),
+        })
     }
 
     /// Block (synchronously) until a rate-limit token is available.
@@ -54,8 +58,7 @@ impl Client {
             match self.limiter.check() {
                 Ok(_) => return,
                 Err(not_until) => {
-                    let now = DefaultClock::default().now();
-                    let wait = not_until.wait_time_from(now);
+                    let wait = not_until.wait_time_from(self.clock.now());
                     std::thread::sleep(wait);
                 }
             }
