@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 
+use chrono::Utc;
 use rand::Rng;
 
 use governor::clock::{Clock, DefaultClock};
@@ -12,6 +14,36 @@ use serde_json::Value;
 use url::Url;
 
 use crate::error::{Error, ErrorKind, Result};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CacheMode {
+    /// Read + write cache.
+    Default,
+    /// Skip read, still write.
+    Refresh,
+    /// Skip both read and write.
+    Bypass,
+}
+
+/// What the endpoint says about caching this specific request.
+#[derive(Debug, Clone, Copy)]
+pub enum TtlHint {
+    Fixed(Duration),
+    UntilMidnight,
+    Never,
+    None,
+}
+
+impl TtlHint {
+    fn to_cache_ttl(self) -> Option<crate::cache::Ttl> {
+        match self {
+            TtlHint::Fixed(d) => Some(crate::cache::Ttl::Fixed(d)),
+            TtlHint::UntilMidnight => Some(crate::cache::Ttl::UntilMidnight),
+            TtlHint::Never => Some(crate::cache::Ttl::Never),
+            TtlHint::None => Option::None,
+        }
+    }
+}
 
 pub const DEFAULT_BASE_URL: &str = "https://api.openarchieven.nl/1.1";
 pub const ENV_BASE_URL: &str = "OPENARCHIEVEN_BASE_URL";
@@ -29,6 +61,7 @@ pub struct ClientConfig {
     pub timeout: Duration,
     pub lang: String,
     pub rate_limit_per_sec: u32,
+    pub cache_mode: CacheMode,
 }
 
 impl Default for ClientConfig {
@@ -38,6 +71,7 @@ impl Default for ClientConfig {
             timeout: Duration::from_secs(30),
             lang: "nl".to_string(),
             rate_limit_per_sec: 4,
+            cache_mode: CacheMode::Default,
         }
     }
 }
@@ -170,6 +204,75 @@ impl Client {
         }
         Err(last.expect("loop only breaks after setting last on a retryable error"))
     }
+
+    /// Cache-aware fetch. Pass `cache = None` to fully bypass cache regardless
+    /// of `cache_mode`. `ttl_hint` controls whether and how long to cache the
+    /// response.
+    pub fn get_cached(
+        &self,
+        path: &str,
+        params: &[(&str, &str)],
+        ttl_hint: TtlHint,
+        cache: Option<&crate::cache::Cache>,
+    ) -> Result<Value> {
+        let cache = cache.filter(|_| !matches!(self.config.cache_mode, CacheMode::Bypass));
+        let key = cache.map(|_| build_cache_key(&self.config.base_url, path, params, ttl_hint));
+
+        if let (Some(c), Some(k)) = (cache, key.as_deref())
+            && matches!(self.config.cache_mode, CacheMode::Default)
+            && let Some(entry) = c.get(k, Utc::now())
+        {
+            return Ok(entry.body);
+        }
+
+        let body = self.get(path, params)?;
+
+        if let (Some(c), Some(k), Some(ttl)) = (cache, key.as_deref(), ttl_hint.to_cache_ttl()) {
+            let now = Utc::now();
+            let entry = crate::cache::Entry {
+                url: build_full_url(&self.config.base_url, path, params),
+                fetched_at: now,
+                expires_at: ttl.expires_at(now),
+                body: body.clone(),
+            };
+            c.put(k, &entry);
+        }
+
+        Ok(body)
+    }
+}
+
+fn build_cache_key(
+    base_url: &str,
+    path: &str,
+    params: &[(&str, &str)],
+    ttl_hint: TtlHint,
+) -> String {
+    let mut sorted: BTreeMap<String, String> = BTreeMap::new();
+    for (k, v) in params {
+        sorted.insert((*k).to_string(), (*v).to_string());
+    }
+    let ttl_class = match ttl_hint {
+        TtlHint::UntilMidnight => Utc::now().date_naive().to_string(),
+        _ => String::new(),
+    };
+    crate::cache::key(base_url, "GET", path, &sorted, &ttl_class)
+}
+
+fn build_full_url(base_url: &str, path: &str, params: &[(&str, &str)]) -> String {
+    let mut url = format!("{}{}", base_url.trim_end_matches('/'), path);
+    if !params.is_empty() {
+        url.push('?');
+        for (i, (k, v)) in params.iter().enumerate() {
+            if i > 0 {
+                url.push('&');
+            }
+            url.push_str(&urlencoding::encode(k));
+            url.push('=');
+            url.push_str(&urlencoding::encode(v));
+        }
+    }
+    url
 }
 
 /// Sleep duration before the next attempt. Honours `Retry-After` verbatim

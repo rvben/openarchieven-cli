@@ -21,6 +21,7 @@ fn client(base_url: &str, timeout_ms: u64) -> Client {
         timeout: Duration::from_millis(timeout_ms),
         lang: "nl".into(),
         rate_limit_per_sec: 1000,
+        ..ClientConfig::default()
     })
     .unwrap()
 }
