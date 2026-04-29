@@ -40,7 +40,7 @@ impl TtlHint {
             TtlHint::Fixed(d) => Some(crate::cache::Ttl::Fixed(d)),
             TtlHint::UntilMidnight => Some(crate::cache::Ttl::UntilMidnight),
             TtlHint::Never => Some(crate::cache::Ttl::Never),
-            TtlHint::None => Option::None,
+            TtlHint::None => None,
         }
     }
 }
@@ -207,7 +207,7 @@ impl Client {
 
     /// Cache-aware fetch. Pass `cache = None` to fully bypass cache regardless
     /// of `cache_mode`. `ttl_hint` controls whether and how long to cache the
-    /// response.
+    /// response; `TtlHint::None` suppresses the write regardless of `cache_mode`.
     pub fn get_cached(
         &self,
         path: &str,
@@ -230,7 +230,7 @@ impl Client {
         if let (Some(c), Some(k), Some(ttl)) = (cache, key.as_deref(), ttl_hint.to_cache_ttl()) {
             let now = Utc::now();
             let entry = crate::cache::Entry {
-                url: build_full_url(&self.config.base_url, path, params),
+                url: self.build_url(path, params)?.to_string(),
                 fetched_at: now,
                 expires_at: ttl.expires_at(now),
                 body: body.clone(),
@@ -257,22 +257,6 @@ fn build_cache_key(
         _ => String::new(),
     };
     crate::cache::key(base_url, "GET", path, &sorted, &ttl_class)
-}
-
-fn build_full_url(base_url: &str, path: &str, params: &[(&str, &str)]) -> String {
-    let mut url = format!("{}{}", base_url.trim_end_matches('/'), path);
-    if !params.is_empty() {
-        url.push('?');
-        for (i, (k, v)) in params.iter().enumerate() {
-            if i > 0 {
-                url.push('&');
-            }
-            url.push_str(&urlencoding::encode(k));
-            url.push('=');
-            url.push_str(&urlencoding::encode(v));
-        }
-    }
-    url
 }
 
 /// Sleep duration before the next attempt. Honours `Retry-After` verbatim
