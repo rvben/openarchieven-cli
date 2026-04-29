@@ -40,9 +40,7 @@ fn execute_once_200_returns_body() {
             .await;
     });
     let c = client(&server.uri());
-    let v = c
-        .execute_once_for_test("/records/search", &[("name", "x")])
-        .unwrap();
+    let v = c.execute_once("/records/search", &[("name", "x")]).unwrap();
     assert_eq!(v["records"].as_array().unwrap().len(), 0);
 }
 
@@ -60,7 +58,7 @@ fn execute_once_400_with_structured_body_is_validation() {
             .await;
     });
     let c = client(&server.uri());
-    let err = c.execute_once_for_test("/records/search", &[]).unwrap_err();
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert_eq!(err.upstream_code(), Some("INVALID_PARAM"));
     assert_eq!(err.upstream_message(), Some("name is required"));
@@ -77,7 +75,7 @@ fn execute_once_404_is_not_found() {
             .await;
     });
     let c = client(&server.uri());
-    let err = c.execute_once_for_test("/records/show", &[]).unwrap_err();
+    let err = c.execute_once("/records/show", &[]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::NotFound);
 }
 
@@ -92,7 +90,7 @@ fn execute_once_429_is_rate_limit_with_retry_after() {
             .await;
     });
     let c = client(&server.uri());
-    let err = c.execute_once_for_test("/records/search", &[]).unwrap_err();
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::RateLimit);
     assert_eq!(err.retry_after_seconds(), Some(30));
 }
@@ -108,7 +106,7 @@ fn execute_once_500_is_server() {
             .await;
     });
     let c = client(&server.uri());
-    let err = c.execute_once_for_test("/records/search", &[]).unwrap_err();
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::Server);
 }
 
@@ -123,6 +121,6 @@ fn execute_once_2xx_unparseable_is_parse() {
             .await;
     });
     let c = client(&server.uri());
-    let err = c.execute_once_for_test("/records/search", &[]).unwrap_err();
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::Parse);
 }

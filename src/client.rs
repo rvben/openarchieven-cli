@@ -101,7 +101,7 @@ impl Client {
     }
 
     /// Single HTTP attempt. No retries, no cache.
-    fn execute_once(&self, path: &str, params: &[(&str, &str)]) -> Result<Value> {
+    pub fn execute_once(&self, path: &str, params: &[(&str, &str)]) -> Result<Value> {
         self.acquire();
         let url = self.build_url(path, params)?;
         let resp = match self.http.get(url).send() {
@@ -133,11 +133,6 @@ impl Client {
         }
 
         Err(map_error_status(status, &body_bytes, retry_after))
-    }
-
-    #[cfg(any(test, feature = "test-helpers"))]
-    pub fn execute_once_for_test(&self, path: &str, params: &[(&str, &str)]) -> Result<Value> {
-        self.execute_once(path, params)
     }
 }
 

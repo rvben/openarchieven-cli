@@ -37,9 +37,6 @@ thiserror = "2"
 url = "2"
 urlencoding = "2"
 
-[features]
-test-helpers = []
-
 [dev-dependencies]
 assert_cmd = "2"
 insta = { version = "1", features = ["json"] }
