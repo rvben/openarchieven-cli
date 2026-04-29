@@ -5,6 +5,8 @@ use governor::clock::{Clock, DefaultClock};
 use governor::middleware::NoOpMiddleware;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
+use reqwest::blocking::Client as HttpClient;
+use serde_json::Value;
 use url::Url;
 
 use crate::error::{Error, ErrorKind, Result};
@@ -35,6 +37,7 @@ impl Default for ClientConfig {
 }
 
 pub struct Client {
+    http: HttpClient,
     config: ClientConfig,
     limiter: Limiter,
     clock: DefaultClock,
@@ -42,10 +45,16 @@ pub struct Client {
 
 impl Client {
     pub fn new(config: ClientConfig) -> Result<Self> {
+        let http = HttpClient::builder()
+            .user_agent(USER_AGENT)
+            .timeout(config.timeout)
+            .build()
+            .map_err(|e| Error::new(ErrorKind::Network, e.to_string()))?;
         let qps =
             NonZeroU32::new(config.rate_limit_per_sec.max(1)).expect("rate_limit_per_sec >= 1");
         let limiter = RateLimiter::direct(Quota::per_second(qps));
         Ok(Self {
+            http,
             config,
             limiter,
             clock: DefaultClock::default(),
@@ -89,6 +98,81 @@ impl Client {
             }
         }
         Ok(url)
+    }
+
+    /// Single HTTP attempt. No retries, no cache.
+    fn execute_once(&self, path: &str, params: &[(&str, &str)]) -> Result<Value> {
+        self.acquire();
+        let url = self.build_url(path, params)?;
+        let resp = match self.http.get(url).send() {
+            Ok(r) => r,
+            Err(e) if e.is_timeout() => {
+                return Err(Error::new(ErrorKind::Timeout, e.to_string()));
+            }
+            Err(e) => {
+                return Err(Error::new(ErrorKind::Network, e.to_string()));
+            }
+        };
+        let status = resp.status();
+        let retry_after = resp
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok());
+        let body_bytes = resp
+            .bytes()
+            .map_err(|e| Error::new(ErrorKind::Network, e.to_string()))?;
+
+        if status.is_success() {
+            return serde_json::from_slice::<Value>(&body_bytes).map_err(|e| {
+                Error::new(
+                    ErrorKind::Parse,
+                    format!("upstream 2xx body did not deserialize: {e}"),
+                )
+            });
+        }
+
+        Err(map_error_status(status, &body_bytes, retry_after))
+    }
+
+    #[cfg(any(test, feature = "test-helpers"))]
+    pub fn execute_once_for_test(&self, path: &str, params: &[(&str, &str)]) -> Result<Value> {
+        self.execute_once(path, params)
+    }
+}
+
+fn map_error_status(status: reqwest::StatusCode, body: &[u8], retry_after: Option<u64>) -> Error {
+    match status.as_u16() {
+        400 => match serde_json::from_slice::<Value>(body) {
+            Ok(v) if v.get("error_code").is_some() => {
+                let code = v
+                    .get("error_code")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let desc = v
+                    .get("error_description")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                Error::new(ErrorKind::Validation, desc.clone()).with_upstream(code, desc)
+            }
+            _ => {
+                let snippet = String::from_utf8_lossy(body);
+                let trimmed: String = snippet.chars().take(200).collect();
+                Error::new(ErrorKind::Validation, trimmed)
+            }
+        },
+        404 => Error::new(ErrorKind::NotFound, "resource not found"),
+        429 => {
+            let mut e = Error::new(ErrorKind::RateLimit, "API throttled");
+            if let Some(secs) = retry_after {
+                e = e.with_retry_after(secs);
+            }
+            e
+        }
+        s if (500..600).contains(&s) => Error::new(ErrorKind::Server, format!("upstream {s}")),
+        s => Error::new(ErrorKind::Server, format!("upstream {s} (unexpected)")),
     }
 }
 

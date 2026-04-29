@@ -84,6 +84,22 @@ impl Error {
         self.retry_after_seconds = Some(secs);
         self
     }
+
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    pub fn upstream_code(&self) -> Option<&str> {
+        self.upstream_code.as_deref()
+    }
+
+    pub fn upstream_message(&self) -> Option<&str> {
+        self.upstream_message.as_deref()
+    }
+
+    pub fn retry_after_seconds(&self) -> Option<u64> {
+        self.retry_after_seconds
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
