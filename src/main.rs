@@ -2,7 +2,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use openarchieven::cli::{ApiArgs, CacheCmd, Cli, Cmd};
+use openarchieven::cli::{ApiArgs, CacheCmd, Cli, Cmd, StatsCmd};
 use openarchieven::error::{Error, ErrorKind, emit_json};
 
 fn main() -> ExitCode {
@@ -68,6 +68,30 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let parsed = openarchieven::commands::weather::parse_rest(rest)?;
             openarchieven::commands::weather::run(client, cache, ctx, &parsed)
         }),
+        Cmd::Stats(StatsCmd::Records(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::records::parse_rest(rest)?;
+                openarchieven::commands::stats::records::run(client, cache, ctx, &parsed)
+            })
+        }
+        Cmd::Stats(StatsCmd::Sources(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::sources::parse_rest(rest)?;
+                openarchieven::commands::stats::sources::run(client, cache, ctx, &parsed)
+            })
+        }
+        Cmd::Stats(StatsCmd::Events(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::events::parse_rest(rest)?;
+                openarchieven::commands::stats::events::run(client, cache, ctx, &parsed)
+            })
+        }
+        Cmd::Stats(StatsCmd::Comments(args)) => {
+            run_endpoint(args, &global, |client, cache, ctx, rest| {
+                let parsed = openarchieven::commands::stats::comments::parse_rest(rest)?;
+                openarchieven::commands::stats::comments::run(client, cache, ctx, &parsed)
+            })
+        }
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
             "cache info: not yet implemented",
