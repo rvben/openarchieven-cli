@@ -4,7 +4,7 @@ use crate::cache::Cache;
 use crate::client::{Client, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
 use crate::output::Renderable;
-use crate::runtime::{ApiContext, TtlOverride};
+use crate::runtime::{ApiContext, resolve_ttl};
 use crate::schema_cmd::{Command, OutputField};
 
 pub fn run(client: &Client, cache: Option<&Cache>, ctx: &ApiContext) -> Result<Renderable> {
@@ -34,15 +34,6 @@ pub fn run(client: &Client, cache: Option<&Cache>, ctx: &ApiContext) -> Result<R
 
 fn default_ttl() -> TtlHint {
     TtlHint::Fixed(Duration::from_secs(24 * 3600))
-}
-
-fn resolve_ttl(ctx: &ApiContext, default: TtlHint) -> TtlHint {
-    match ctx.cache_ttl_override {
-        Some(TtlOverride::Disabled) => TtlHint::None,
-        Some(TtlOverride::Forever) => TtlHint::Never,
-        Some(TtlOverride::Fixed(d)) => TtlHint::Fixed(d),
-        None => default,
-    }
 }
 
 pub fn schema() -> Command {

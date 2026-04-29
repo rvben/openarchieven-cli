@@ -4,13 +4,24 @@ use crate::cache::Cache;
 use crate::client::{Client, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
 use crate::output::Renderable;
-use crate::runtime::{ApiContext, TtlOverride};
+use crate::runtime::{ApiContext, resolve_ttl};
 use crate::schema_cmd::{Arg, Command, OutputField};
 
 pub const SUPPORTED_LANGS: &[&str] = &["nl", "en"];
 pub const MAX_LIMIT: u32 = 100;
 pub const DEFAULT_LIMIT: u32 = 10;
 
+const SUPPORTED_FLAGS: &[&str] = &[
+    "--archive",
+    "--source-type",
+    "--event-place",
+    "--birth-place",
+    "--relation-type",
+    "--country",
+    "--sort",
+];
+
+#[derive(Debug, Clone, Default)]
 pub struct Args {
     pub name: String,
     pub archive: Option<String>,
@@ -44,6 +55,12 @@ pub fn run(
         return Err(Error::new(
             ErrorKind::Validation,
             format!("--limit: exceeds maximum of {MAX_LIMIT}"),
+        ));
+    }
+    if limit == 0 {
+        return Err(Error::new(
+            ErrorKind::Validation,
+            "--limit: must be at least 1",
         ));
     }
 
@@ -96,54 +113,34 @@ pub fn run(
 }
 
 pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let supported_flags = [
-        "--archive",
-        "--source-type",
-        "--event-place",
-        "--birth-place",
-        "--relation-type",
-        "--country",
-        "--sort",
-    ];
-
-    let mut a = Args {
-        name: String::new(),
-        archive: None,
-        source_type: None,
-        event_place: None,
-        birth_place: None,
-        relation_type: None,
-        country: None,
-        sort: None,
-    };
-
+    let mut a = Args::default();
     let mut positionals: Vec<String> = Vec::new();
     let mut iter = rest.iter();
 
     while let Some(tok) = iter.next() {
         let s = tok.as_str();
         if let Some(v) = s.strip_prefix("--archive=") {
-            a.archive = Some(v.to_string());
+            a.archive = Some(non_empty("--archive", v)?);
         } else if s == "--archive" {
             a.archive = Some(next_value("--archive", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--source-type=") {
-            a.source_type = Some(v.to_string());
+            a.source_type = Some(non_empty("--source-type", v)?);
         } else if s == "--source-type" {
             a.source_type = Some(next_value("--source-type", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--event-place=") {
-            a.event_place = Some(v.to_string());
+            a.event_place = Some(non_empty("--event-place", v)?);
         } else if s == "--event-place" {
             a.event_place = Some(next_value("--event-place", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--birth-place=") {
-            a.birth_place = Some(v.to_string());
+            a.birth_place = Some(non_empty("--birth-place", v)?);
         } else if s == "--birth-place" {
             a.birth_place = Some(next_value("--birth-place", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--relation-type=") {
-            a.relation_type = Some(v.to_string());
+            a.relation_type = Some(non_empty("--relation-type", v)?);
         } else if s == "--relation-type" {
             a.relation_type = Some(next_value("--relation-type", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--country=") {
-            a.country = Some(v.to_string());
+            a.country = Some(non_empty("--country", v)?);
         } else if s == "--country" {
             a.country = Some(next_value("--country", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--sort=") {
@@ -166,7 +163,7 @@ pub fn parse_rest(rest: &[String]) -> Result<Args> {
                 ErrorKind::Validation,
                 format!(
                     "unknown flag: {s}. supported: {}",
-                    supported_flags.join(", ")
+                    SUPPORTED_FLAGS.join(", ")
                 ),
             ));
         } else {
@@ -195,22 +192,31 @@ pub fn parse_rest(rest: &[String]) -> Result<Args> {
 }
 
 fn next_value(flag: &str, iter: &mut std::slice::Iter<'_, String>) -> Result<String> {
-    iter.next()
-        .cloned()
-        .ok_or_else(|| Error::new(ErrorKind::Validation, format!("{flag}: missing value")))
+    match iter.next() {
+        Some(v) if v.starts_with("--") => Err(Error::new(
+            ErrorKind::Validation,
+            format!("{flag}: missing value (got flag '{v}' instead)"),
+        )),
+        Some(v) => Ok(v.clone()),
+        None => Err(Error::new(
+            ErrorKind::Validation,
+            format!("{flag}: missing value"),
+        )),
+    }
+}
+
+fn non_empty(flag: &str, v: &str) -> Result<String> {
+    if v.is_empty() {
+        return Err(Error::new(
+            ErrorKind::Validation,
+            format!("{flag}: value must not be empty"),
+        ));
+    }
+    Ok(v.to_string())
 }
 
 fn default_ttl() -> TtlHint {
     TtlHint::Fixed(Duration::from_secs(6 * 3600))
-}
-
-fn resolve_ttl(ctx: &ApiContext, default: TtlHint) -> TtlHint {
-    match ctx.cache_ttl_override {
-        Some(TtlOverride::Disabled) => TtlHint::None,
-        Some(TtlOverride::Forever) => TtlHint::Never,
-        Some(TtlOverride::Fixed(d)) => TtlHint::Fixed(d),
-        None => default,
-    }
 }
 
 pub fn schema() -> Command {
@@ -354,7 +360,7 @@ pub fn schema() -> Command {
             },
             OutputField {
                 name: "total",
-                ty: "integer",
+                ty: "integer | null",
             },
             OutputField {
                 name: "limit",
@@ -369,5 +375,152 @@ pub fn schema() -> Command {
                 ty: "boolean",
             },
         ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strs(args: &[&str]) -> Vec<String> {
+        args.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn missing_name_is_validation_error() {
+        let err = parse_rest(&[]).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("name"), "message: {}", err.message());
+    }
+
+    #[test]
+    fn multiple_positionals_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "de groot"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn unknown_flag_lists_supported() {
+        let err = parse_rest(&strs(&["--zzz", "jansen"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--zzz"),
+            "message: {}",
+            err.message()
+        );
+        assert!(
+            err.message().contains("--archive"),
+            "message: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn archive_space_form() {
+        let a = parse_rest(&strs(&["--archive", "elo", "jansen"])).unwrap();
+        assert_eq!(a.archive.as_deref(), Some("elo"));
+        assert_eq!(a.name, "jansen");
+    }
+
+    #[test]
+    fn archive_eq_form() {
+        let a = parse_rest(&strs(&["--archive=elo", "jansen"])).unwrap();
+        assert_eq!(a.archive.as_deref(), Some("elo"));
+    }
+
+    #[test]
+    fn archive_eq_empty_is_validation_error() {
+        let err = parse_rest(&strs(&["--archive=", "jansen"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--archive"),
+            "message: {}",
+            err.message()
+        );
+        assert!(
+            err.message().contains("empty"),
+            "message: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn archive_at_end_of_input_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--archive"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--archive"),
+            "message: {}",
+            err.message()
+        );
+        assert!(
+            err.message().contains("missing value"),
+            "message: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn archive_followed_by_flag_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--archive", "--sort", "3"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--archive"),
+            "message: {}",
+            err.message()
+        );
+        assert!(
+            err.message().contains("--sort"),
+            "message: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn sort_space_form() {
+        let a = parse_rest(&strs(&["jansen", "--sort", "3"])).unwrap();
+        assert_eq!(a.sort, Some(3));
+    }
+
+    #[test]
+    fn sort_negative_value() {
+        let a = parse_rest(&strs(&["jansen", "--sort", "-3"])).unwrap();
+        assert_eq!(a.sort, Some(-3));
+    }
+
+    #[test]
+    fn sort_not_an_integer() {
+        let err = parse_rest(&strs(&["jansen", "--sort=notanint"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--sort"),
+            "message: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn full_args_roundtrip() {
+        let a = parse_rest(&strs(&[
+            "jansen",
+            "--archive",
+            "elo",
+            "--source-type",
+            "BS",
+            "--event-place=Amsterdam",
+            "--birth-place=Leiden",
+            "--relation-type=vader",
+            "--country=NL",
+            "--sort=2",
+        ]))
+        .unwrap();
+        assert_eq!(a.name, "jansen");
+        assert_eq!(a.archive.as_deref(), Some("elo"));
+        assert_eq!(a.source_type.as_deref(), Some("BS"));
+        assert_eq!(a.event_place.as_deref(), Some("Amsterdam"));
+        assert_eq!(a.birth_place.as_deref(), Some("Leiden"));
+        assert_eq!(a.relation_type.as_deref(), Some("vader"));
+        assert_eq!(a.country.as_deref(), Some("NL"));
+        assert_eq!(a.sort, Some(2));
     }
 }

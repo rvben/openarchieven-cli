@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::cache::Cache;
 use crate::cli::{ApiArgs, Cli, FormatArg};
-use crate::client::{CacheMode, Client, ClientConfig};
+use crate::client::{CacheMode, Client, ClientConfig, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
 use crate::tty::{Format, Stream, is_tty};
 
@@ -152,6 +152,15 @@ pub fn build_cache(api: &ApiContext) -> Result<Option<Cache>> {
 
 fn default_cache_dir() -> Option<PathBuf> {
     directories::ProjectDirs::from("", "", "openarchieven").map(|p| p.cache_dir().to_path_buf())
+}
+
+pub fn resolve_ttl(ctx: &ApiContext, default: TtlHint) -> TtlHint {
+    match ctx.cache_ttl_override {
+        Some(TtlOverride::Disabled) => TtlHint::None,
+        Some(TtlOverride::Forever) => TtlHint::Never,
+        Some(TtlOverride::Fixed(d)) => TtlHint::Fixed(d),
+        None => default,
+    }
 }
 
 #[cfg(test)]
