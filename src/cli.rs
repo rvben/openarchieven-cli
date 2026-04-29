@@ -29,7 +29,7 @@ pub struct Cli {
     pub quiet: bool,
 
     /// Disable ANSI colors. Also via NO_COLOR env.
-    #[arg(global = true, long)]
+    #[arg(global = true, long, env = "NO_COLOR")]
     pub no_color: bool,
 
     #[command(subcommand)]
@@ -77,12 +77,19 @@ pub enum Cmd {
 
 #[derive(Debug, Subcommand)]
 pub enum StatsCmd {
+    /// Aggregate record counts by archive.
     Records(ApiArgs),
+    /// Aggregate source counts by archive.
     Sources(ApiArgs),
+    /// Aggregate event counts by archive.
     Events(ApiArgs),
+    /// Aggregate comment counts by archive.
     Comments(ApiArgs),
+    /// Family-name frequency stats.
     Familynames(ApiArgs),
+    /// First-name frequency stats.
     Firstnames(ApiArgs),
+    /// Profession frequency stats.
     Professions(ApiArgs),
 }
 
@@ -100,8 +107,9 @@ pub enum CacheCmd {
 }
 
 /// Catch-all positional + flag holder for endpoint commands. Each command's
-/// `run()` function does its own validation against `args.positional` and
-/// `args.flags` — clap rejects nothing here.
+/// `run()` function does its own validation against `args.rest` — clap rejects
+/// nothing here. In later phases each endpoint will graduate to a dedicated
+/// `clap::Args` struct with typed fields.
 #[derive(Debug, clap::Args)]
 pub struct ApiArgs {
     /// Per-request timeout (humantime: 30s, 1m, 500ms).
