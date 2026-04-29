@@ -64,6 +64,10 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let parsed = openarchieven::commands::census::parse_rest(rest)?;
             openarchieven::commands::census::run(client, cache, ctx, &parsed)
         }),
+        Cmd::Weather(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
+            let parsed = openarchieven::commands::weather::parse_rest(rest)?;
+            openarchieven::commands::weather::run(client, cache, ctx, &parsed)
+        }),
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
             "cache info: not yet implemented",
