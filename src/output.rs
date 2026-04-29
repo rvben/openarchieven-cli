@@ -97,6 +97,35 @@ impl Renderable {
     }
 }
 
+/// Apply a `--fields` filter using the union of observed object keys as the
+/// known-fields set. Single-nested responses are rejected.
+///
+/// Use this from the dispatch layer; commands shouldn't need to publish a
+/// row-level field list separately from the response itself.
+pub fn apply_fields_auto(r: Renderable, fields: &[String]) -> Result<Renderable> {
+    if r.shape == Shape::SingleNested {
+        return Err(Error::new(
+            ErrorKind::Validation,
+            "--fields is not supported for nested single-record responses (try -o json | jq)",
+        ));
+    }
+    let known_set: std::collections::BTreeSet<String> = match (r.shape, &r.body) {
+        (Shape::List, Value::Array(items)) => items
+            .iter()
+            .filter_map(|v| v.as_object())
+            .flat_map(|o| o.keys().cloned())
+            .collect(),
+        (Shape::SingleFlat, Value::Object(o)) => o.keys().cloned().collect(),
+        _ => return Ok(r),
+    };
+    if known_set.is_empty() {
+        // Nothing to validate against (e.g. empty list); filter is a no-op.
+        return Ok(r);
+    }
+    let known: Vec<&str> = known_set.iter().map(String::as_str).collect();
+    apply_fields(r, fields, &known)
+}
+
 /// Apply a `--fields` filter to a `List` or `SingleFlat` `Renderable`.
 ///
 /// Returns a new `Renderable`. Returns `validation` if any field is unknown,
@@ -366,6 +395,53 @@ mod tests {
         let err = apply_fields(r, &["a".into()], &["a"]).unwrap_err();
         assert_eq!(err.kind, ErrorKind::Validation);
         assert!(err.message.contains("nested"));
+    }
+
+    #[test]
+    fn fields_auto_derives_known_set_from_list_items() {
+        let r = Renderable::list(
+            json!([{"a": 1, "b": 2}, {"a": 3, "c": 4}]),
+            false,
+            None,
+            None,
+        );
+        let r = apply_fields_auto(r, &["a".into()]).unwrap();
+        let items = r.body.as_array().unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(items[0].as_object().unwrap().contains_key("a"));
+        assert!(!items[0].as_object().unwrap().contains_key("b"));
+    }
+
+    #[test]
+    fn fields_auto_rejects_unknown_against_observed_keys() {
+        let r = Renderable::list(json!([{"a": 1}]), false, None, None);
+        let err = apply_fields_auto(r, &["zzz".into()]).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::Validation);
+        assert!(err.message.contains("zzz"));
+    }
+
+    #[test]
+    fn fields_auto_filters_single_flat() {
+        let r = Renderable::single_flat(json!({"x": 1, "y": 2}));
+        let r = apply_fields_auto(r, &["x".into()]).unwrap();
+        let obj = r.body.as_object().unwrap();
+        assert!(obj.contains_key("x"));
+        assert!(!obj.contains_key("y"));
+    }
+
+    #[test]
+    fn fields_auto_rejects_single_nested_shape() {
+        let r = Renderable::single_nested(json!({"a": {"b": 1}}));
+        let err = apply_fields_auto(r, &["a".into()]).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::Validation);
+        assert!(err.message.contains("nested"));
+    }
+
+    #[test]
+    fn fields_auto_is_noop_for_empty_list() {
+        let r = Renderable::list(json!([]), false, None, None);
+        let r = apply_fields_auto(r, &["anything".into()]).unwrap();
+        assert_eq!(r.body.as_array().unwrap().len(), 0);
     }
 
     #[test]

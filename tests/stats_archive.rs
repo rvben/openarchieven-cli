@@ -184,21 +184,3 @@ fn stats_records_rejects_lang_other_than_nl() {
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--lang"));
 }
-
-#[test]
-fn stats_records_rejects_fields() {
-    let rt = rt();
-    let server = rt.block_on(MockServer::start());
-
-    let dir = tempdir().unwrap();
-    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
-    let client = make_client(&server);
-
-    let mut c = ctx();
-    c.fields = Some(vec!["records".into()]);
-
-    let err = records::run(&client, Some(&cache), &c, &ArchiveStatArgs::default()).unwrap_err();
-
-    assert_eq!(err.kind(), ErrorKind::Validation);
-    assert!(err.message().contains("--fields"));
-}

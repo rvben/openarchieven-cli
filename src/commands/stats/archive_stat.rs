@@ -20,12 +20,6 @@ pub fn run_archive_stat(
     ctx: &ApiContext,
     args: &ArchiveStatArgs,
 ) -> Result<Renderable> {
-    if ctx.fields.is_some() {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!("--fields is not supported for `stats {command_name}`; use `-o json | jq`"),
-        ));
-    }
     if ctx.limit.is_some() || ctx.offset.is_some() {
         return Err(Error::new(
             ErrorKind::Validation,

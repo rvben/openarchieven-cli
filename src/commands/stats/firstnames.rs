@@ -24,12 +24,6 @@ pub fn run(
     ctx: &ApiContext,
     args: &Args,
 ) -> Result<Renderable> {
-    if ctx.fields.is_some() {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            "--fields is not supported for `stats firstnames`; use `-o json | jq`",
-        ));
-    }
     if ctx.offset.is_some() {
         return Err(Error::new(
             ErrorKind::Validation,

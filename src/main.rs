@@ -161,7 +161,10 @@ where
     let rest = args.rest;
     let client = openarchieven::runtime::build_client(&ctx)?;
     let cache = openarchieven::runtime::build_cache(&ctx)?;
-    let renderable = f(&client, cache.as_ref(), &ctx, &rest)?;
+    let mut renderable = f(&client, cache.as_ref(), &ctx, &rest)?;
+    if let Some(fields) = ctx.fields.as_deref() {
+        renderable = openarchieven::output::apply_fields_auto(renderable, fields)?;
+    }
     openarchieven::output::render(
         &mut std::io::stdout().lock(),
         &renderable,
