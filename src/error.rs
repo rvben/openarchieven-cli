@@ -87,6 +87,42 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+use std::io::Write;
+
+/// Emit the error as a single JSON line to the given writer.
+///
+/// Always emits valid JSON; the canonical contract for agents.
+pub fn emit_json<W: Write>(w: &mut W, err: &Error) -> std::io::Result<()> {
+    #[derive(Serialize)]
+    struct Payload<'a> {
+        error: Body<'a>,
+    }
+    #[derive(Serialize)]
+    struct Body<'a> {
+        kind: &'static str,
+        message: &'a str,
+        retryable: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        upstream_code: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        upstream_message: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        retry_after_seconds: Option<u64>,
+    }
+    let payload = Payload {
+        error: Body {
+            kind: err.kind.as_str(),
+            message: &err.message,
+            retryable: err.kind.retryable(),
+            upstream_code: err.upstream_code.as_deref(),
+            upstream_message: err.upstream_message.as_deref(),
+            retry_after_seconds: err.retry_after_seconds,
+        },
+    };
+    serde_json::to_writer(&mut *w, &payload).map_err(std::io::Error::other)?;
+    writeln!(w)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,5 +163,44 @@ mod tests {
     fn kind_string_is_snake_case() {
         assert_eq!(ErrorKind::RateLimit.as_str(), "rate_limit");
         assert_eq!(ErrorKind::NotFound.as_str(), "not_found");
+    }
+
+    #[test]
+    fn emits_minimal_payload() {
+        let err = Error::new(ErrorKind::NotFound, "no such record");
+        let mut buf = Vec::new();
+        emit_json(&mut buf, &err).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        let v: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+        assert_eq!(v["error"]["kind"], "not_found");
+        assert_eq!(v["error"]["message"], "no such record");
+        assert_eq!(v["error"]["retryable"], false);
+        assert!(v["error"].get("upstream_code").is_none());
+        assert!(v["error"].get("retry_after_seconds").is_none());
+    }
+
+    #[test]
+    fn emits_upstream_metadata() {
+        let err = Error::new(ErrorKind::Validation, "invalid eventyear")
+            .with_upstream("INVALID_PARAM", "eventyear must be 1500..1960");
+        let mut buf = Vec::new();
+        emit_json(&mut buf, &err).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert_eq!(v["error"]["upstream_code"], "INVALID_PARAM");
+        assert_eq!(
+            v["error"]["upstream_message"],
+            "eventyear must be 1500..1960"
+        );
+    }
+
+    #[test]
+    fn emits_retry_after() {
+        let err = Error::new(ErrorKind::RateLimit, "throttled").with_retry_after(30);
+        let mut buf = Vec::new();
+        emit_json(&mut buf, &err).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert_eq!(v["error"]["kind"], "rate_limit");
+        assert_eq!(v["error"]["retryable"], true);
+        assert_eq!(v["error"]["retry_after_seconds"], 30);
     }
 }
