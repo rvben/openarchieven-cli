@@ -1,0 +1,22 @@
+[[hooks]]
+id = "cargo-fmt"
+name = "cargo fmt"
+entry = "cargo fmt --all -- --check"
+language = "system"
+files = "\\.rs$"
+pass_filenames = false
+
+[[hooks]]
+id = "cargo-clippy"
+name = "cargo clippy"
+entry = "cargo clippy --all-targets --all-features -- -D warnings"
+language = "system"
+files = "\\.rs$"
+pass_filenames = false
+
+[[hooks]]
+id = "conventional-commits"
+name = "conventional commits"
+entry = "vership lint-commit"
+language = "system"
+stages = ["commit-msg"]
