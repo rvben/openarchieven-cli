@@ -1,6 +1,7 @@
 .PHONY: check build test lint fmt install \
         release-patch release-minor release-major \
         release-build release-archive homebrew-formula \
+        build-wheel build-sdist publish-crates publish-pypi \
         test-live clean
 
 check: lint test
@@ -55,6 +56,32 @@ homebrew-formula:
 	@if [ -z "$(VERSION)" ]; then echo "VERSION is required"; exit 1; fi
 	@if [ -z "$(TAG)" ]; then echo "TAG is required"; exit 1; fi
 	./scripts/render-homebrew-formula.sh $(VERSION) $(TAG) > dist/openarchieven.rb
+
+# Build a Python wheel via maturin for $(TARGET).
+# MATURIN_ARGS lets the caller append e.g. "--compatibility manylinux_2_28 --zig"
+# for cross-compiled Linux wheels. The same invocation also produces the release
+# binary in target/$(TARGET)/release/, which `release-archive` then packages.
+# e.g. make build-wheel TARGET=x86_64-unknown-linux-gnu \
+#                       MATURIN_ARGS="--compatibility manylinux_2_28 --zig"
+build-wheel:
+	@if [ -z "$(TARGET)" ]; then echo "TARGET is required"; exit 1; fi
+	maturin build --release --target $(TARGET) $(MATURIN_ARGS)
+
+# Build a source distribution (.tar.gz) for PyPI.
+build-sdist:
+	maturin sdist
+
+# Publish the crate to crates.io. Expects CARGO_REGISTRY_TOKEN in the env.
+publish-crates:
+	cargo publish --locked
+
+# Upload all wheels and the sdist found under $(WHEEL_DIR) and $(SDIST_DIR) to
+# PyPI. Expects TWINE_USERNAME=__token__ and TWINE_PASSWORD=<pypi token> in env.
+# e.g. make publish-pypi WHEEL_DIR=artifacts/wheels SDIST_DIR=artifacts/sdist
+publish-pypi:
+	@if [ -z "$(WHEEL_DIR)" ]; then echo "WHEEL_DIR is required"; exit 1; fi
+	@if [ -z "$(SDIST_DIR)" ]; then echo "SDIST_DIR is required"; exit 1; fi
+	uv tool run twine upload $(WHEEL_DIR)/**/*.whl $(SDIST_DIR)/*.tar.gz
 
 test-live:
 	OPENARCHIEVEN_TEST_LIVE=1 cargo test --test live -- --nocapture
