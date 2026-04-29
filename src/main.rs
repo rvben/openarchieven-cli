@@ -44,6 +44,18 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let parsed = openarchieven::commands::match_record::parse_rest(rest)?;
             openarchieven::commands::match_record::run(client, cache, ctx, &parsed)
         }),
+        Cmd::Births(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
+            let parsed = openarchieven::commands::births::parse_rest(rest)?;
+            openarchieven::commands::births::run(client, cache, ctx, &parsed)
+        }),
+        Cmd::Deaths(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
+            let parsed = openarchieven::commands::deaths::parse_rest(rest)?;
+            openarchieven::commands::deaths::run(client, cache, ctx, &parsed)
+        }),
+        Cmd::Marriages(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
+            let parsed = openarchieven::commands::marriages::parse_rest(rest)?;
+            openarchieven::commands::marriages::run(client, cache, ctx, &parsed)
+        }),
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
             "cache info: not yet implemented",

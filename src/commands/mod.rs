@@ -9,6 +9,7 @@ pub mod births;
 pub mod cache_cmd;
 pub mod census;
 pub mod deaths;
+pub mod event_records;
 pub mod marriages;
 pub mod match_record;
 pub mod search;
