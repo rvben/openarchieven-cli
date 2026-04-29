@@ -289,7 +289,7 @@ fn map_error_status(status: reqwest::StatusCode, body: &[u8], retry_after: Optio
     }
 }
 
-/// Parse the upstream's structured 400 body once. The Open Archives API
+/// Parse the upstream's structured 400 body once. The openarchieven.nl API
 /// returns `{"error_code","error_description"}`; both are surfaced as
 /// upstream metadata. Falls back to a truncated raw snippet otherwise.
 fn map_validation_400(body: &[u8]) -> Error {

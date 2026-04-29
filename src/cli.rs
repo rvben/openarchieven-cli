@@ -15,7 +15,7 @@ pub enum FormatArg {
 #[command(
     name = "openarchieven",
     version,
-    about = "Agent-friendly CLI for the Open Archives Dutch genealogical API",
+    about = "Agent-friendly CLI for the openarchieven.nl Dutch genealogical API",
     propagate_version = true,
     disable_help_subcommand = true
 )]

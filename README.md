@@ -1,6 +1,6 @@
 # openarchieven
 
-CLI for the [Open Archives](https://api.openarchieven.nl) Dutch genealogical
+CLI for the [openarchieven.nl](https://www.openarchieven.nl/) Dutch genealogical
 API. Designed for humans, scripts, and AI agents per [clispec.dev](https://clispec.dev).
 
 ## Install

@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "openarchieven"
 dynamic = ["version"]
-description = "CLI for the Open Archives Dutch genealogical API"
+description = "CLI for the openarchieven.nl Dutch genealogical API"
 readme = "README.md"
 requires-python = ">=3.7"
 license = { text = "MIT" }

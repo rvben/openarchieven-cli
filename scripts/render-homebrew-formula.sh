@@ -38,7 +38,7 @@ sha_x86_64_unknown_linux_gnu=$(read_sha x86_64-unknown-linux-gnu)
 
 cat <<FORMULA
 class Openarchieven < Formula
-  desc "Command-line interface to the Open Archives genealogical API"
+  desc "Command-line interface to the openarchieven.nl Dutch genealogical API"
   homepage "https://github.com/rvben/openarchieven-cli"
   version "${version}"
   license "MIT"

@@ -1,4 +1,4 @@
-//! openarchieven — CLI for the Open Archives genealogical API.
+//! openarchieven — CLI for the openarchieven.nl Dutch genealogical API.
 
 pub mod cache;
 pub mod cli;

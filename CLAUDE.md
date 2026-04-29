@@ -15,7 +15,7 @@ make install   # release build → ~/.local/bin/openarchieven
 
 ## Architecture
 
-Binary `openarchieven` wraps the Open Archives API per the design spec at
+Binary `openarchieven` wraps the openarchieven.nl API per the design spec at
 `docs/superpowers/specs/2026-04-29-openarchieven-cli-design.md`. Core flow:
 `main.rs` parses args → command module → `Client::get()` (cache + rate limit
 + retry) → response shaped into `Renderable` → renderer (json/table/markdown)
