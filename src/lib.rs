@@ -4,8 +4,10 @@
 //! stdout/stderr.
 
 pub mod cache;
+pub mod commands;
 pub mod error;
 pub mod output;
+pub mod schema_cmd;
 pub mod tty;
 
 use std::process::ExitCode;
