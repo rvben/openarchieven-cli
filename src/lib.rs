@@ -4,6 +4,7 @@
 //! stdout/stderr.
 
 pub mod error;
+pub mod tty;
 
 use std::process::ExitCode;
 
