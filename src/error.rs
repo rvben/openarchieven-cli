@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use std::fmt;
+use std::io::Write;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -87,8 +88,6 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-use std::io::Write;
-
 /// Emit the error as a single JSON line to the given writer.
 ///
 /// Always emits valid JSON; the canonical contract for agents.
@@ -170,8 +169,7 @@ mod tests {
         let err = Error::new(ErrorKind::NotFound, "no such record");
         let mut buf = Vec::new();
         emit_json(&mut buf, &err).unwrap();
-        let s = String::from_utf8(buf).unwrap();
-        let v: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&buf).unwrap();
         assert_eq!(v["error"]["kind"], "not_found");
         assert_eq!(v["error"]["message"], "no such record");
         assert_eq!(v["error"]["retryable"], false);
@@ -191,6 +189,7 @@ mod tests {
             v["error"]["upstream_message"],
             "eventyear must be 1500..1960"
         );
+        assert_eq!(v["error"]["retryable"], false);
     }
 
     #[test]
