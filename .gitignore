@@ -1,5 +1,6 @@
 /target
 /.cache
+/dist
 **/*.rs.bk
 Cargo.lock.bak
 .DS_Store
