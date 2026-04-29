@@ -5,7 +5,7 @@ pub fn schema() -> Command {
         name: "show",
         description: "<TODO>",
         mutating: false,
-        response_shape: "list",
+        response_shape: "single-nested",
         paginated: false,
         cache_ttl_seconds: None,
         cache_ttl_strategy: "none",

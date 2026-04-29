@@ -199,90 +199,12 @@ fn commands() -> Vec<Command> {
         crate::commands::stats::familynames::schema(),
         crate::commands::stats::firstnames::schema(),
         crate::commands::stats::professions::schema(),
-        cache_info_schema(),
-        cache_clear_schema(),
-        cache_prune_schema(),
+        crate::commands::cache_cmd::info_schema(),
+        crate::commands::cache_cmd::clear_schema(),
+        crate::commands::cache_cmd::prune_schema(),
         schema_self(),
         version_self(),
     ]
-}
-
-fn cache_info_schema() -> Command {
-    Command {
-        name: "cache info",
-        description: "Show cache location, total size, and entry count",
-        mutating: false,
-        response_shape: "single-flat",
-        paginated: false,
-        cache_ttl_seconds: None,
-        cache_ttl_strategy: "none",
-        args: vec![],
-        output_fields: vec![
-            OutputField {
-                name: "root",
-                ty: "string",
-            },
-            OutputField {
-                name: "entries",
-                ty: "integer",
-            },
-            OutputField {
-                name: "bytes",
-                ty: "integer",
-            },
-            OutputField {
-                name: "oldest",
-                ty: "datetime | null",
-            },
-            OutputField {
-                name: "newest",
-                ty: "datetime | null",
-            },
-        ],
-    }
-}
-
-fn cache_clear_schema() -> Command {
-    Command {
-        name: "cache clear",
-        description: "Delete all cache entries (requires --yes)",
-        mutating: true,
-        response_shape: "single-flat",
-        paginated: false,
-        cache_ttl_seconds: None,
-        cache_ttl_strategy: "none",
-        args: vec![Arg {
-            name: "--yes",
-            ty: "boolean",
-            required: true,
-            positional: false,
-            default: None,
-            min: None,
-            max: None,
-            r#enum: None,
-        }],
-        output_fields: vec![OutputField {
-            name: "deleted",
-            ty: "integer",
-        }],
-    }
-}
-
-fn cache_prune_schema() -> Command {
-    Command {
-        name: "cache prune",
-        description: "Delete only expired cache entries",
-        mutating: true,
-        response_shape: "single-flat",
-        paginated: false,
-        cache_ttl_seconds: None,
-        cache_ttl_strategy: "none",
-        args: vec![],
-        output_fields: vec![OutputField {
-            name: "deleted",
-            ty: "integer",
-        }],
-    }
 }
 
 fn schema_self() -> Command {
@@ -320,35 +242,20 @@ fn version_self() -> Command {
 mod tests {
     use super::*;
 
-    // Until command modules exist, this stub builder is exercised in
-    // tests/schema.rs (snapshot). Here we just verify the static blocks.
-
     #[test]
     fn errors_block_lists_eight_kinds() {
         assert_eq!(errors().len(), 8);
     }
 
     #[test]
-    fn output_formats_are_three() {
-        let s = Schema {
-            name: "openarchieven",
-            version: "0.1.0",
-            base_url: "https://api.openarchieven.nl/1.1",
-            rate_limit: RateLimit {
-                requests_per_second: 4,
-                scope: "per_ip",
-            },
-            output_formats: vec!["json", "table", "markdown"],
-            env_vars: vec![],
-            cache: CacheInfo {
-                default_dir_template: "x",
-                file_permissions: "0600",
-                dir_permissions: "0700",
-            },
-            commands: vec![],
-            errors: errors(),
-        };
-        let v = serde_json::to_value(&s).unwrap();
-        assert_eq!(v["output_formats"].as_array().unwrap().len(), 3);
+    fn build_emits_three_output_formats() {
+        let s = build();
+        assert_eq!(s.output_formats, vec!["json", "table", "markdown"]);
+    }
+
+    #[test]
+    fn build_emits_twentytwo_commands() {
+        // 17 API/CLI commands + cache info/clear/prune + schema + version.
+        assert_eq!(build().commands.len(), 22);
     }
 }

@@ -6,6 +6,7 @@
 
 pub mod archives;
 pub mod births;
+pub mod cache_cmd;
 pub mod census;
 pub mod deaths;
 pub mod marriages;
