@@ -39,26 +39,26 @@ sha_x86_64_unknown_linux_gnu=$(read_sha x86_64-unknown-linux-gnu)
 cat <<FORMULA
 class Openarchieven < Formula
   desc "Command-line interface to the Open Archives genealogical API"
-  homepage "https://github.com/rvben/openarchieven"
+  homepage "https://github.com/rvben/openarchieven-cli"
   version "${version}"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/rvben/openarchieven/releases/download/${tag}/openarchieven-${version}-aarch64-apple-darwin.tar.gz"
+      url "https://github.com/rvben/openarchieven-cli/releases/download/${tag}/openarchieven-${version}-aarch64-apple-darwin.tar.gz"
       sha256 "${sha_aarch64_apple_darwin}"
     else
-      url "https://github.com/rvben/openarchieven/releases/download/${tag}/openarchieven-${version}-x86_64-apple-darwin.tar.gz"
+      url "https://github.com/rvben/openarchieven-cli/releases/download/${tag}/openarchieven-${version}-x86_64-apple-darwin.tar.gz"
       sha256 "${sha_x86_64_apple_darwin}"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/rvben/openarchieven/releases/download/${tag}/openarchieven-${version}-aarch64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/rvben/openarchieven-cli/releases/download/${tag}/openarchieven-${version}-aarch64-unknown-linux-gnu.tar.gz"
       sha256 "${sha_aarch64_unknown_linux_gnu}"
     else
-      url "https://github.com/rvben/openarchieven/releases/download/${tag}/openarchieven-${version}-x86_64-unknown-linux-gnu.tar.gz"
+      url "https://github.com/rvben/openarchieven-cli/releases/download/${tag}/openarchieven-${version}-x86_64-unknown-linux-gnu.tar.gz"
       sha256 "${sha_x86_64_unknown_linux_gnu}"
     end
   end

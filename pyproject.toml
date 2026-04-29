@@ -27,8 +27,8 @@ keywords = ["genealogy", "openarchieven", "cli", "agent-friendly"]
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/rvben/openarchieven"
-Repository = "https://github.com/rvben/openarchieven.git"
+Homepage = "https://github.com/rvben/openarchieven-cli"
+Repository = "https://github.com/rvben/openarchieven-cli.git"
 
 [tool.maturin]
 bindings = "bin"
