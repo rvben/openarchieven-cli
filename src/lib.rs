@@ -4,6 +4,7 @@
 //! stdout/stderr.
 
 pub mod cache;
+pub mod client;
 pub mod commands;
 pub mod error;
 pub mod output;
