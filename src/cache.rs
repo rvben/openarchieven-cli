@@ -6,13 +6,15 @@
 
 use crate::error::{Error, ErrorKind, Result};
 use chrono::{DateTime, Utc};
+use fs4::fs_std::FileExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Derive a cache key.
 ///
@@ -59,6 +61,8 @@ fn canonical_base_url(s: &str) -> String {
         s.trim_end_matches('/').to_string()
     }
 }
+
+const LOCK_FILENAME: &str = ".lock";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {
@@ -210,6 +214,176 @@ fn set_file_private(path: &Path) {
 fn set_dir_private(_: &Path) {}
 #[cfg(not(unix))]
 fn set_file_private(_: &Path) {}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Info {
+    pub root: PathBuf,
+    pub entries: u64,
+    pub bytes: u64,
+    pub oldest: Option<DateTime<Utc>>,
+    pub newest: Option<DateTime<Utc>>,
+}
+
+impl Cache {
+    /// Snapshot stats. Reads without locking; result may be slightly stale.
+    pub fn info(&self) -> Result<Info> {
+        let mut entries = 0u64;
+        let mut bytes = 0u64;
+        let mut oldest: Option<DateTime<Utc>> = None;
+        let mut newest: Option<DateTime<Utc>> = None;
+        if !self.root.exists() {
+            return Ok(Info {
+                root: self.root.clone(),
+                entries: 0,
+                bytes: 0,
+                oldest: None,
+                newest: None,
+            });
+        }
+        for de in fs::read_dir(&self.root)
+            .map_err(|e| Error::new(ErrorKind::Validation, format!("read cache-dir: {e}")))?
+        {
+            let de =
+                de.map_err(|e| Error::new(ErrorKind::Validation, format!("dir entry: {e}")))?;
+            if !is_entry_filename(&de.file_name().to_string_lossy()) {
+                continue;
+            }
+            let meta = match de.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if !meta.is_file() {
+                continue;
+            }
+            entries += 1;
+            bytes += meta.len();
+            if let Ok(bytes_buf) = fs::read(de.path())
+                && let Ok(e) = serde_json::from_slice::<Entry>(&bytes_buf)
+            {
+                oldest = Some(oldest.map_or(e.fetched_at, |o| o.min(e.fetched_at)));
+                newest = Some(newest.map_or(e.fetched_at, |n| n.max(e.fetched_at)));
+            }
+        }
+        Ok(Info {
+            root: self.root.clone(),
+            entries,
+            bytes,
+            oldest,
+            newest,
+        })
+    }
+
+    /// Delete every cache entry. Acquires an exclusive advisory lock; waits up
+    /// to 5s before returning a `validation` error.
+    pub fn clear(&self) -> Result<u64> {
+        self.with_exclusive_lock(|| {
+            let mut deleted = 0u64;
+            for de in fs::read_dir(&self.root)
+                .map_err(|e| Error::new(ErrorKind::Validation, format!("read cache-dir: {e}")))?
+            {
+                let de =
+                    de.map_err(|e| Error::new(ErrorKind::Validation, format!("dir entry: {e}")))?;
+                let name = de.file_name().to_string_lossy().to_string();
+                if !is_entry_filename(&name) {
+                    continue;
+                }
+                let path = de.path();
+                let meta = match fs::symlink_metadata(&path) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                if !meta.is_file() {
+                    continue;
+                }
+                if fs::remove_file(&path).is_ok() {
+                    deleted += 1;
+                }
+            }
+            Ok(deleted)
+        })
+    }
+
+    /// Delete only expired entries. Corrupted entries are also removed.
+    pub fn prune(&self, now: DateTime<Utc>) -> Result<u64> {
+        self.with_exclusive_lock(|| {
+            let mut deleted = 0u64;
+            for de in fs::read_dir(&self.root)
+                .map_err(|e| Error::new(ErrorKind::Validation, format!("read cache-dir: {e}")))?
+            {
+                let de =
+                    de.map_err(|e| Error::new(ErrorKind::Validation, format!("dir entry: {e}")))?;
+                let name = de.file_name().to_string_lossy().to_string();
+                if !is_entry_filename(&name) {
+                    continue;
+                }
+                let path = de.path();
+                let meta = match fs::symlink_metadata(&path) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                if !meta.is_file() {
+                    continue;
+                }
+                let bytes = match fs::read(&path) {
+                    Ok(b) => b,
+                    Err(_) => continue,
+                };
+                let entry: Entry = match serde_json::from_slice(&bytes) {
+                    Ok(e) => e,
+                    Err(_) => {
+                        if fs::remove_file(&path).is_ok() {
+                            deleted += 1;
+                        }
+                        continue;
+                    }
+                };
+                if entry.is_expired(now) && fs::remove_file(&path).is_ok() {
+                    deleted += 1;
+                }
+            }
+            Ok(deleted)
+        })
+    }
+
+    fn with_exclusive_lock<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
+        let lock_path = self.root.join(LOCK_FILENAME);
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|e| Error::new(ErrorKind::Validation, format!("lock open: {e}")))?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match lock.try_lock_exclusive() {
+                Ok(()) => break,
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    if Instant::now() >= deadline {
+                        return Err(Error::new(
+                            ErrorKind::Validation,
+                            "another openarchieven cache operation is in progress",
+                        ));
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                Err(e) => {
+                    return Err(Error::new(
+                        ErrorKind::Validation,
+                        format!("lock acquire: {e}"),
+                    ));
+                }
+            }
+        }
+        let result = f();
+        let _ = lock.unlock();
+        result
+    }
+}
+
+fn is_entry_filename(name: &str) -> bool {
+    name.len() == 69 && name.ends_with(".json") && name[..64].chars().all(|c| c.is_ascii_hexdigit())
+}
 
 #[cfg(test)]
 mod tests {
@@ -436,5 +610,91 @@ mod store_tests {
         std::os::unix::fs::symlink(&target, &link).unwrap();
         let err = Cache::open(link, false).unwrap_err();
         assert_eq!(err.kind, ErrorKind::Validation);
+    }
+}
+
+#[cfg(test)]
+mod ops_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn info_counts_entries_and_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let now = Utc::now();
+        let entry = Entry {
+            url: "u".into(),
+            fetched_at: now,
+            expires_at: Some(now + chrono::Duration::hours(1)),
+            body: json!({}),
+        };
+        cache.put("a".repeat(64).as_str(), &entry);
+        cache.put("b".repeat(64).as_str(), &entry);
+        let info = cache.info().unwrap();
+        assert_eq!(info.entries, 2);
+        assert!(info.bytes > 0);
+    }
+
+    #[test]
+    fn clear_removes_only_entry_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let entry = Entry {
+            url: "u".into(),
+            fetched_at: Utc::now(),
+            expires_at: None,
+            body: json!({}),
+        };
+        cache.put("a".repeat(64).as_str(), &entry);
+        std::fs::write(dir.path().join("README.txt"), "keep me").unwrap();
+        let n = cache.clear().unwrap();
+        assert_eq!(n, 1);
+        assert!(dir.path().join("README.txt").exists());
+    }
+
+    #[test]
+    fn prune_keeps_fresh_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let now = Utc::now();
+        let fresh = Entry {
+            url: "u".into(),
+            fetched_at: now,
+            expires_at: Some(now + chrono::Duration::hours(1)),
+            body: json!({}),
+        };
+        let stale = Entry {
+            url: "u".into(),
+            fetched_at: now - chrono::Duration::days(1),
+            expires_at: Some(now - chrono::Duration::hours(1)),
+            body: json!({}),
+        };
+        cache.put("a".repeat(64).as_str(), &fresh);
+        cache.put("b".repeat(64).as_str(), &stale);
+        let n = cache.prune(now).unwrap();
+        assert_eq!(n, 1);
+        assert_eq!(cache.info().unwrap().entries, 1);
+    }
+
+    #[test]
+    fn prune_removes_corrupted_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        std::fs::write(
+            dir.path().join(format!("{}.json", "c".repeat(64))),
+            "not json",
+        )
+        .unwrap();
+        let n = cache.prune(Utc::now()).unwrap();
+        assert_eq!(n, 1);
+    }
+
+    #[test]
+    fn entry_filename_predicate() {
+        assert!(is_entry_filename(&format!("{}.json", "a".repeat(64))));
+        assert!(!is_entry_filename(".lock"));
+        assert!(!is_entry_filename("hello.json"));
+        assert!(!is_entry_filename(&format!("{}.json", "Z".repeat(64))));
     }
 }
