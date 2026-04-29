@@ -36,6 +36,10 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let parsed = openarchieven::commands::search::parse_rest(rest)?;
             openarchieven::commands::search::run(client, cache, ctx, &parsed)
         }),
+        Cmd::Show(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
+            let parsed = openarchieven::commands::show::parse_rest(rest)?;
+            openarchieven::commands::show::run(client, cache, ctx, &parsed)
+        }),
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
             "cache info: not yet implemented",
