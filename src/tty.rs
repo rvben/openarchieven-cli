@@ -24,7 +24,7 @@ pub enum Format {
 
 impl Format {
     pub fn parse(s: &str) -> Option<Self> {
-        match s {
+        match s.to_ascii_lowercase().as_str() {
             "json" => Some(Format::Json),
             "table" => Some(Format::Table),
             "markdown" => Some(Format::Markdown),
@@ -38,6 +38,12 @@ impl Format {
             Format::Table => "table",
             Format::Markdown => "markdown",
         }
+    }
+}
+
+impl std::fmt::Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -79,6 +85,17 @@ mod tests {
             Format::Markdown
         );
         assert_eq!(resolve_format(None, Some("json"), true), Format::Json);
+        assert_eq!(resolve_format(None, Some("table"), false), Format::Table);
+    }
+
+    #[test]
+    fn env_is_case_insensitive() {
+        assert_eq!(resolve_format(None, Some("JSON"), true), Format::Json);
+        assert_eq!(resolve_format(None, Some("Table"), false), Format::Table);
+        assert_eq!(
+            resolve_format(None, Some("MarkDown"), true),
+            Format::Markdown
+        );
     }
 
     #[test]
