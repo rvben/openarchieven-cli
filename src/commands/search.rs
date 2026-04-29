@@ -144,20 +144,10 @@ pub fn parse_rest(rest: &[String]) -> Result<Args> {
         } else if s == "--country" {
             a.country = Some(next_value("--country", &mut iter)?);
         } else if let Some(v) = s.strip_prefix("--sort=") {
-            a.sort = Some(v.parse::<i32>().map_err(|_| {
-                Error::new(
-                    ErrorKind::Validation,
-                    format!("--sort: not an integer: {v}"),
-                )
-            })?);
+            a.sort = Some(parse_sort(v)?);
         } else if s == "--sort" {
             let v = next_value("--sort", &mut iter)?;
-            a.sort = Some(v.parse::<i32>().map_err(|_| {
-                Error::new(
-                    ErrorKind::Validation,
-                    format!("--sort: not an integer: {v}"),
-                )
-            })?);
+            a.sort = Some(parse_sort(&v)?);
         } else if s.starts_with("--") {
             return Err(Error::new(
                 ErrorKind::Validation,
@@ -213,6 +203,24 @@ fn non_empty(flag: &str, v: &str) -> Result<String> {
         ));
     }
     Ok(v.to_string())
+}
+
+/// Validate `--sort` per the schema enum: integers in [-6,-1] ∪ [1,6].
+/// 0 is rejected; values outside the range are rejected.
+fn parse_sort(v: &str) -> Result<i32> {
+    let n: i32 = v.parse().map_err(|_| {
+        Error::new(
+            ErrorKind::Validation,
+            format!("--sort: not an integer: {v}"),
+        )
+    })?;
+    if n == 0 || !(-6..=6).contains(&n) {
+        return Err(Error::new(
+            ErrorKind::Validation,
+            format!("--sort: must be in -6..=-1 or 1..=6, got {n}"),
+        ));
+    }
+    Ok(n)
 }
 
 fn default_ttl() -> TtlHint {
@@ -497,6 +505,25 @@ mod tests {
             "message: {}",
             err.message()
         );
+    }
+
+    #[test]
+    fn sort_zero_is_rejected() {
+        let err = parse_rest(&strs(&["jansen", "--sort=0"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("-6..=-1 or 1..=6"));
+    }
+
+    #[test]
+    fn sort_above_six_is_rejected() {
+        let err = parse_rest(&strs(&["jansen", "--sort", "7"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn sort_below_negative_six_is_rejected() {
+        let err = parse_rest(&strs(&["jansen", "--sort=-7"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
     }
 
     #[test]
