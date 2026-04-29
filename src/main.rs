@@ -29,8 +29,12 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             println!("{json}");
             Ok(())
         }
-        Cmd::Archives(args) => run_endpoint(args, &global, |client, cache, ctx| {
+        Cmd::Archives(args) => run_endpoint(args, &global, |client, cache, ctx, _rest| {
             openarchieven::commands::archives::run(client, cache, ctx)
+        }),
+        Cmd::Search(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
+            let parsed = openarchieven::commands::search::parse_rest(rest)?;
+            openarchieven::commands::search::run(client, cache, ctx, &parsed)
         }),
         Cmd::Cache(CacheCmd::Info) => Err(Error::new(
             ErrorKind::Validation,
@@ -61,12 +65,14 @@ where
         &openarchieven::client::Client,
         Option<&openarchieven::cache::Cache>,
         &openarchieven::runtime::ApiContext,
+        &[String],
     ) -> Result<openarchieven::output::Renderable, Error>,
 {
     let ctx = openarchieven::runtime::ApiContext::from_args(&args)?;
+    let rest = args.rest;
     let client = openarchieven::runtime::build_client(&ctx)?;
     let cache = openarchieven::runtime::build_cache(&ctx)?;
-    let renderable = f(&client, cache.as_ref(), &ctx)?;
+    let renderable = f(&client, cache.as_ref(), &ctx, &rest)?;
     openarchieven::output::render(
         &mut std::io::stdout().lock(),
         &renderable,

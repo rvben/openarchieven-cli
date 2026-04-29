@@ -33,6 +33,7 @@ pub struct Renderable {
     pub paginated: bool,
     pub limit: Option<u32>,
     pub offset: Option<u32>,
+    pub total: Option<u64>,
 }
 
 impl Renderable {
@@ -43,6 +44,7 @@ impl Renderable {
             paginated,
             limit,
             offset,
+            total: None,
         }
     }
 
@@ -53,6 +55,7 @@ impl Renderable {
             paginated: false,
             limit: None,
             offset: None,
+            total: None,
         }
     }
 
@@ -63,7 +66,13 @@ impl Renderable {
             paginated: false,
             limit: None,
             offset: None,
+            total: None,
         }
+    }
+
+    pub fn with_total(mut self, total: Option<u64>) -> Self {
+        self.total = total;
+        self
     }
 
     /// For `List`: build the wrapper `{items, total, limit, offset, paginated}`.
@@ -156,7 +165,7 @@ pub fn render<W: Write>(
 fn render_json<W: Write>(out: &mut W, r: &Renderable, pretty: bool) -> std::io::Result<()> {
     match r.shape {
         Shape::List => {
-            let envelope = r.list_envelope(None);
+            let envelope = r.list_envelope(r.total);
             if pretty {
                 serde_json::to_writer_pretty(&mut *out, &envelope)?;
             } else {
