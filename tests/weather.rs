@@ -43,7 +43,51 @@ fn make_client(server: &MockServer) -> Client {
 }
 
 #[test]
-fn weather_returns_nested() {
+fn weather_returns_list() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/related/weather.json"))
+            .and(query_param("date", "1850-06-15"))
+            .and(query_param("longitude", "4.49"))
+            .and(query_param("latitude", "52.16"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "STN": {"label": "stationnummer", "value": "344"},
+                    "YYYYMMDD": {"label": "datum", "value": "18500615"},
+                    "TG": {"label": "etmaalgemiddelde temperatuur (in 0.1 graden Celsius)", "value": "180"},
+                    "FHX": {"label": "hoogste uurgemiddelde windsnelheid (in 0.1 m/s)", "value": "45"}
+                }
+            ])))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let r = weather::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &weather::Args {
+            date: "1850-06-15".into(),
+            longitude: "4.49".into(),
+            latitude: "52.16".into(),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(r.shape, Shape::List);
+    let env = r.list_envelope(Some(1));
+    assert_eq!(env["total"], 1);
+    assert_eq!(env["items"][0]["STN"]["value"], "344");
+}
+
+#[test]
+fn weather_tolerates_single_object_response() {
     let rt = rt();
     let server = rt.block_on(MockServer::start());
     rt.block_on(async {
@@ -53,7 +97,8 @@ fn weather_returns_nested() {
             .and(query_param("longitude", "4.49"))
             .and(query_param("latitude", "52.16"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "weather": {"temp": 18}
+                "STN": {"label": "stationnummer", "value": "344"},
+                "TG": {"label": "temp", "value": "180"}
             })))
             .mount(&server)
             .await;
@@ -75,8 +120,11 @@ fn weather_returns_nested() {
     )
     .unwrap();
 
-    assert_eq!(r.shape, Shape::SingleNested);
-    assert_eq!(r.body["weather"]["temp"], 18);
+    // Single-object upstream response is wrapped as a one-item list.
+    assert_eq!(r.shape, Shape::List);
+    let env = r.list_envelope(Some(1));
+    assert_eq!(env["total"], 1);
+    assert_eq!(env["items"][0]["STN"]["value"], "344");
 }
 
 #[test]
@@ -155,34 +203,6 @@ fn weather_rejects_unknown_lang() {
 
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--lang"));
-}
-
-#[test]
-fn weather_rejects_fields() {
-    let rt = rt();
-    let server = rt.block_on(MockServer::start());
-
-    let dir = tempdir().unwrap();
-    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
-    let client = make_client(&server);
-
-    let mut c = ctx();
-    c.fields = Some(vec!["weather".into()]);
-
-    let err = weather::run(
-        &client,
-        Some(&cache),
-        &c,
-        &weather::Args {
-            date: "1850-06-15".into(),
-            longitude: "4.49".into(),
-            latitude: "52.16".into(),
-        },
-    )
-    .unwrap_err();
-
-    assert_eq!(err.kind(), ErrorKind::Validation);
-    assert!(err.message().contains("--fields"));
 }
 
 #[test]

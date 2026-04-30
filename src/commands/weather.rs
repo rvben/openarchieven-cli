@@ -5,7 +5,7 @@ use crate::client::{Client, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
 use crate::output::Renderable;
 use crate::runtime::{ApiContext, resolve_ttl};
-use crate::schema_cmd::{Arg, Command};
+use crate::schema_cmd::{Arg, Command, OutputField};
 
 const SUPPORTED_LANGS: &[&str] = &["nl", "en"];
 
@@ -22,12 +22,6 @@ pub fn run(
     ctx: &ApiContext,
     args: &Args,
 ) -> Result<Renderable> {
-    if ctx.fields.is_some() {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            "--fields is not supported for `weather` (single-nested shape); use `-o json | jq`",
-        ));
-    }
     if ctx.limit.is_some() || ctx.offset.is_some() {
         return Err(Error::new(
             ErrorKind::Validation,
@@ -55,7 +49,18 @@ pub fn run(
     ];
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(30 * 24 * 3600)));
     let body = client.get_cached("/related/weather.json", &params, ttl, cache)?;
-    Ok(Renderable::single_nested(body))
+
+    let items = match body {
+        serde_json::Value::Array(items) => items,
+        // Tolerate single-object shape if upstream ever returns a bare object.
+        serde_json::Value::Object(_) => vec![body],
+        _ => Vec::new(),
+    };
+    let total = items.len() as u64;
+    Ok(
+        Renderable::list(serde_json::Value::Array(items), false, None, None)
+            .with_total(Some(total)),
+    )
 }
 
 fn validate_iso_date(s: &str) -> Result<()> {
@@ -160,7 +165,7 @@ pub fn schema() -> Command {
         name: "weather",
         description: "Historical weather observations for a date and coordinate.",
         mutating: false,
-        response_shape: "single-nested",
+        response_shape: "list",
         paginated: false,
         cache_ttl_seconds: Some(30 * 24 * 3600),
         cache_ttl_strategy: "fixed",
@@ -206,7 +211,28 @@ pub fn schema() -> Command {
                 r#enum: Some(vec![serde_json::json!("nl"), serde_json::json!("en")]),
             },
         ],
-        output_fields: vec![],
+        output_fields: vec![
+            OutputField {
+                name: "items",
+                ty: "array<observation>",
+            },
+            OutputField {
+                name: "total",
+                ty: "integer",
+            },
+            OutputField {
+                name: "limit",
+                ty: "null",
+            },
+            OutputField {
+                name: "offset",
+                ty: "null",
+            },
+            OutputField {
+                name: "paginated",
+                ty: "boolean",
+            },
+        ],
     }
 }
 
@@ -372,7 +398,7 @@ mod tests {
     fn schema_returns_correct_command_name() {
         let cmd = schema();
         assert_eq!(cmd.name, "weather");
-        assert_eq!(cmd.response_shape, "single-nested");
+        assert_eq!(cmd.response_shape, "list");
         let date_arg = cmd.args.iter().find(|a| a.name == "--date").unwrap();
         assert!(date_arg.required);
     }

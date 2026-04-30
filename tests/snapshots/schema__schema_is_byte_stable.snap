@@ -589,7 +589,7 @@ expression: s
       "name": "weather",
       "description": "Historical weather observations for a date and coordinate.",
       "mutating": false,
-      "response_shape": "single-nested",
+      "response_shape": "list",
       "paginated": false,
       "cache_ttl_seconds": 2592000,
       "cache_ttl_strategy": "fixed",
@@ -624,7 +624,28 @@ expression: s
           ]
         }
       ],
-      "output_fields": []
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<observation>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "null"
+        },
+        {
+          "name": "offset",
+          "type": "null"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
     },
     {
       "name": "stats records",
