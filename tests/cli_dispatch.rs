@@ -214,6 +214,44 @@ fn show_404_propagates_not_found_to_stderr() {
 }
 
 #[test]
+fn show_upstream_error_envelope_exits_nonzero_with_stderr_error() {
+    // When the upstream returns HTTP 200 with {error_code, error_description},
+    // the CLI must exit non-zero and emit a JSON error on stderr (not stdout).
+    let env = Env::new();
+    env.rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/show.json"))
+            .and(query_param("archive_code", "ZZZ"))
+            .and(query_param("identifier", "12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "error_code": 1,
+                "error_description": "Invalid archive",
+                "request": "show"
+            })))
+            .mount(&env.server)
+            .await;
+    });
+    let out = env
+        .cmd()
+        .args(["-o", "json", "show", "ZZZ", "12345"])
+        .assert()
+        .failure();
+    let output = out.get_output();
+    assert!(output.stdout.is_empty(), "stdout must be empty on error");
+    assert_eq!(output.status.code(), Some(1));
+    let v = last_json_line(&output.stderr);
+    assert_eq!(v["error"]["kind"], "not_found");
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid archive"),
+        "message: {}",
+        v["error"]["message"]
+    );
+}
+
+#[test]
 fn match_dispatch_sends_name_and_birth_year() {
     let env = Env::new();
     env.mount_get_with_params(

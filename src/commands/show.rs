@@ -51,6 +51,20 @@ pub fn run(
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
     let body = client.get_cached("/records/show.json", &params, ttl, cache)?;
 
+    // The upstream API returns HTTP 200 with an error envelope instead of a 4xx.
+    // Translate it to NotFound so the stderr+exit-1 contract holds.
+    if body.get("error_code").is_some()
+        && let Some(desc) = body.get("error_description").and_then(|v| v.as_str())
+    {
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!(
+                "no record found for {}/{} (upstream: {})",
+                args.archive, args.identifier, desc
+            ),
+        ));
+    }
+
     // Empty 2xx body means the API returned "no record" without a 404.
     let is_empty = match &body {
         serde_json::Value::Object(m) => m.is_empty(),

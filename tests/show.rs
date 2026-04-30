@@ -272,3 +272,43 @@ fn show_null_body_is_not_found() {
 
     assert_eq!(err.kind(), ErrorKind::NotFound);
 }
+
+#[test]
+fn show_upstream_invalid_archive_is_not_found() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/show.json"))
+            .and(query_param("archive_code", "ZZZ"))
+            .and(query_param("identifier", "12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "error_code": 1,
+                "error_description": "Invalid archive",
+                "request": "show"
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let err = show::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &show::Args {
+            archive: "ZZZ".into(),
+            identifier: "12345".into(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::NotFound);
+    assert_eq!(
+        err.message(),
+        "no record found for ZZZ/12345 (upstream: Invalid archive)"
+    );
+}
