@@ -51,6 +51,7 @@ fn archives_returns_list_with_total_and_paginated_false() {
         limit: None,
         offset: None,
         lang: "nl".into(),
+        quiet: false,
     };
 
     let r = archives::run(&client, Some(&cache), &ctx).unwrap();
@@ -94,6 +95,7 @@ fn archives_tolerates_legacy_wrapped_shape() {
         limit: None,
         offset: None,
         lang: "nl".into(),
+        quiet: false,
     };
 
     let r = archives::run(&client, Some(&cache), &ctx).unwrap();
@@ -127,6 +129,7 @@ fn archives_rejects_limit_with_validation() {
         limit: Some(10),
         offset: None,
         lang: "nl".into(),
+        quiet: false,
     };
     let err = archives::run(&client, Some(&cache), &ctx).unwrap_err();
     assert_eq!(err.kind(), openarchieven::error::ErrorKind::Validation);

@@ -1,3 +1,5 @@
+use chrono::{Datelike, Local, NaiveDate};
+
 use crate::cache::Cache;
 use crate::client::{Client, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
@@ -48,6 +50,16 @@ pub fn run(
         None => DEFAULT_LIMIT,
     };
 
+    let target = resolve_yearsago(Local::now().date_naive(), args.years);
+    if !ctx.quiet {
+        eprintln!(
+            "note: searching for records from {:04}-{:02}-{:02}",
+            target.year(),
+            target.month(),
+            target.day()
+        );
+    }
+
     let years_s = args.years.to_string();
     let limit_s = limit.to_string();
     let params: Vec<(&str, &str)> = vec![
@@ -69,6 +81,13 @@ pub fn run(
         Renderable::list(serde_json::Value::Array(items), false, None, None)
             .with_total(Some(total)),
     )
+}
+
+fn resolve_yearsago(today: NaiveDate, years: u32) -> NaiveDate {
+    let target_year = today.year() - years as i32;
+    NaiveDate::from_ymd_opt(target_year, today.month(), today.day())
+        .or_else(|| NaiveDate::from_ymd_opt(target_year, today.month(), 28))
+        .unwrap_or(today)
 }
 
 pub fn schema() -> Command {
@@ -116,5 +135,25 @@ pub fn schema() -> Command {
                 ty: "boolean",
             },
         ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_yearsago_subtracts_years() {
+        let today = NaiveDate::from_ymd_opt(2026, 4, 30).unwrap();
+        let r = resolve_yearsago(today, 100);
+        assert_eq!(r, NaiveDate::from_ymd_opt(1926, 4, 30).unwrap());
+    }
+
+    #[test]
+    fn resolve_yearsago_handles_leap_day() {
+        let today = NaiveDate::from_ymd_opt(2024, 2, 29).unwrap();
+        let r = resolve_yearsago(today, 1);
+        // 2023 is not a leap year — fall back to Feb 28
+        assert_eq!(r, NaiveDate::from_ymd_opt(2023, 2, 28).unwrap());
     }
 }

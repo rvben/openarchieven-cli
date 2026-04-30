@@ -26,6 +26,7 @@ pub struct ApiContext {
     pub limit: Option<u32>,
     pub offset: Option<u32>,
     pub lang: String,
+    pub quiet: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,10 +66,11 @@ struct ApiContextInput<'a> {
     limit: Option<u32>,
     offset: Option<u32>,
     lang: Option<&'a str>,
+    quiet: bool,
 }
 
 impl ApiContext {
-    pub fn from_global_args(args: &crate::cli::GlobalApiArgs) -> Result<Self> {
+    pub fn from_global_args(args: &crate::cli::GlobalApiArgs, quiet: bool) -> Result<Self> {
         ApiContextInput {
             timeout: args.timeout,
             no_cache: args.no_cache,
@@ -79,6 +81,7 @@ impl ApiContext {
             limit: args.limit,
             offset: args.offset,
             lang: args.lang.as_deref(),
+            quiet,
         }
         .build()
     }
@@ -134,6 +137,7 @@ impl ApiContextInput<'_> {
             limit: self.limit,
             offset: self.offset,
             lang: self.lang.unwrap_or("nl").to_string(),
+            quiet: self.quiet,
         })
     }
 }
@@ -218,13 +222,13 @@ mod tests {
         let mut g = args();
         g.no_cache = true;
         g.refresh = true;
-        let err = ApiContext::from_global_args(&g).unwrap_err();
+        let err = ApiContext::from_global_args(&g, false).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Validation);
     }
 
     #[test]
     fn from_global_args_lang_defaults_to_nl() {
-        let ctx = ApiContext::from_global_args(&args()).unwrap();
+        let ctx = ApiContext::from_global_args(&args(), false).unwrap();
         assert_eq!(ctx.lang, "nl");
     }
 
@@ -233,7 +237,7 @@ mod tests {
         let mut a = args();
         a.no_cache = true;
         a.refresh = true;
-        let err = ApiContext::from_global_args(&a).unwrap_err();
+        let err = ApiContext::from_global_args(&a, false).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Validation);
     }
 
@@ -241,7 +245,7 @@ mod tests {
     fn cache_ttl_zero_means_bypass() {
         let mut a = args();
         a.cache_ttl = Some("0".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert!(matches!(ctx.cache_mode, CacheMode::Bypass));
     }
 
@@ -249,7 +253,7 @@ mod tests {
     fn cache_ttl_inf_means_forever() {
         let mut a = args();
         a.cache_ttl = Some("inf".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert!(matches!(ctx.cache_ttl_override, Some(TtlOverride::Forever)));
     }
 
@@ -257,13 +261,13 @@ mod tests {
     fn fields_csv_is_parsed() {
         let mut a = args();
         a.fields = Some("name, year ,place".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert_eq!(ctx.fields.unwrap(), vec!["name", "year", "place"]);
     }
 
     #[test]
     fn lang_defaults_to_nl() {
-        let ctx = ApiContext::from_global_args(&args()).unwrap();
+        let ctx = ApiContext::from_global_args(&args(), false).unwrap();
         assert_eq!(ctx.lang, "nl");
     }
 
@@ -271,7 +275,7 @@ mod tests {
     fn refresh_flag_sets_refresh_mode() {
         let mut a = args();
         a.refresh = true;
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert!(matches!(ctx.cache_mode, CacheMode::Refresh));
     }
 
@@ -279,7 +283,7 @@ mod tests {
     fn cache_ttl_invalid_string_is_validation_error() {
         let mut a = args();
         a.cache_ttl = Some("notaduration".into());
-        let err = ApiContext::from_global_args(&a).unwrap_err();
+        let err = ApiContext::from_global_args(&a, false).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Validation);
     }
 
@@ -305,7 +309,7 @@ mod tests {
     fn cache_ttl_humantime_duration_sets_fixed_ttl() {
         let mut a = args();
         a.cache_ttl = Some("1h".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert!(
             matches!(ctx.cache_ttl_override, Some(TtlOverride::Fixed(d)) if d == Duration::from_secs(3600))
         );
@@ -316,7 +320,7 @@ mod tests {
     fn no_cache_flag_sets_bypass_mode() {
         let mut a = args();
         a.no_cache = true;
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert!(matches!(ctx.cache_mode, CacheMode::Bypass));
     }
 
@@ -324,7 +328,7 @@ mod tests {
     fn timeout_arg_is_respected() {
         let mut a = args();
         a.timeout = Some(Duration::from_secs(10));
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert_eq!(ctx.timeout, Duration::from_secs(10));
     }
 
@@ -332,7 +336,7 @@ mod tests {
     fn empty_fields_string_produces_empty_vec() {
         let mut a = args();
         a.fields = Some("".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert!(ctx.fields.as_ref().unwrap().is_empty());
     }
 
@@ -340,7 +344,7 @@ mod tests {
     fn lang_arg_overrides_default() {
         let mut a = args();
         a.lang = Some("en".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert_eq!(ctx.lang, "en");
     }
 
@@ -349,7 +353,7 @@ mod tests {
         let mut a = args();
         a.limit = Some(20);
         a.offset = Some(5);
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         assert_eq!(ctx.limit, Some(20));
         assert_eq!(ctx.offset, Some(5));
     }
@@ -358,7 +362,7 @@ mod tests {
     fn resolve_ttl_disabled_override_returns_none() {
         let mut a = args();
         a.cache_ttl = Some("0".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         let hint = resolve_ttl(&ctx, TtlHint::Fixed(Duration::from_secs(60)));
         assert!(matches!(hint, TtlHint::None));
     }
@@ -367,7 +371,7 @@ mod tests {
     fn resolve_ttl_forever_override_returns_never() {
         let mut a = args();
         a.cache_ttl = Some("inf".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         let hint = resolve_ttl(&ctx, TtlHint::Fixed(Duration::from_secs(60)));
         assert!(matches!(hint, TtlHint::Never));
     }
@@ -376,14 +380,14 @@ mod tests {
     fn resolve_ttl_fixed_override_replaces_default() {
         let mut a = args();
         a.cache_ttl = Some("30m".into());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         let hint = resolve_ttl(&ctx, TtlHint::UntilMidnight);
         assert!(matches!(hint, TtlHint::Fixed(d) if d == Duration::from_secs(1800)));
     }
 
     #[test]
     fn resolve_ttl_no_override_returns_default() {
-        let ctx = ApiContext::from_global_args(&args()).unwrap();
+        let ctx = ApiContext::from_global_args(&args(), false).unwrap();
         let hint = resolve_ttl(&ctx, TtlHint::UntilMidnight);
         assert!(matches!(hint, TtlHint::UntilMidnight));
     }
@@ -395,7 +399,7 @@ mod tests {
         a.cache_ttl = Some("0s".into());
         // humantime returns Ok(Duration::ZERO) for "0s" in recent versions.
         // If it fails to parse, that's also acceptable — just check it doesn't panic.
-        match ApiContext::from_global_args(&a) {
+        match ApiContext::from_global_args(&a, false) {
             Ok(ctx) => assert!(matches!(ctx.cache_mode, CacheMode::Bypass)),
             Err(e) => assert_eq!(e.kind(), ErrorKind::Validation),
         }
@@ -458,7 +462,7 @@ mod tests {
 
     #[test]
     fn build_client_returns_ok_with_valid_context() {
-        let ctx = ApiContext::from_global_args(&args()).unwrap();
+        let ctx = ApiContext::from_global_args(&args(), false).unwrap();
         assert!(build_client(&ctx).is_ok());
     }
 
@@ -466,7 +470,7 @@ mod tests {
     fn build_cache_returns_none_when_bypass() {
         let mut a = args();
         a.no_cache = true;
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         let result = build_cache(&ctx).unwrap();
         assert!(result.is_none());
     }
@@ -476,7 +480,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut a = args();
         a.cache_dir = Some(dir.path().to_path_buf());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         let result = build_cache(&ctx).unwrap();
         assert!(result.is_some());
     }
@@ -502,7 +506,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut a = args();
         a.cache_dir = Some(dir.path().to_path_buf());
-        let ctx = ApiContext::from_global_args(&a).unwrap();
+        let ctx = ApiContext::from_global_args(&a, false).unwrap();
         unsafe { std::env::set_var("OPENARCHIEVEN_CACHE_DISABLE", "1") };
         let result = build_cache(&ctx).unwrap();
         unsafe { std::env::remove_var("OPENARCHIEVEN_CACHE_DISABLE") };

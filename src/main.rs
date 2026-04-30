@@ -381,7 +381,7 @@ where
         &openarchieven::runtime::ApiContext,
     ) -> Result<openarchieven::output::Renderable, Error>,
 {
-    let ctx = openarchieven::runtime::ApiContext::from_global_args(&api_args)?;
+    let ctx = openarchieven::runtime::ApiContext::from_global_args(&api_args, global.quiet)?;
     let client = openarchieven::runtime::build_client(&ctx)?;
     let cache = openarchieven::runtime::build_cache(&ctx)?;
     let mut renderable = f(&client, cache.as_ref(), &ctx)?;

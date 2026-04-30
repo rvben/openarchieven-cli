@@ -27,6 +27,7 @@ fn ctx() -> ApiContext {
         limit: None,
         offset: None,
         lang: "nl".into(),
+        quiet: false,
     }
 }
 
