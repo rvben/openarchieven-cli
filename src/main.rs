@@ -140,10 +140,27 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::deaths::run(client, cache, ctx, &typed)
             })
         }
-        Cmd::Marriages(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::marriages::parse_rest(rest)?;
-            openarchieven::commands::marriages::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::Marriages(args) => {
+            let openarchieven::cli::MarriagesArgs {
+                global: global_api,
+                name1,
+                name2,
+                event_year,
+                event_place,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::marriages::Args {
+                    name1,
+                    name2,
+                    flags: openarchieven::commands::event_records::CommonFlags {
+                        event_year,
+                        event_place,
+                        event_province: None,
+                    },
+                };
+                openarchieven::commands::marriages::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Yearsago(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
             let parsed = openarchieven::commands::yearsago::parse_rest(rest)?;
             openarchieven::commands::yearsago::run(client, cache, ctx, &parsed)

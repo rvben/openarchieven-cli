@@ -1,7 +1,6 @@
 use crate::cache::Cache;
 use crate::client::Client;
-use crate::commands::event_records::{CommonFlags, Endpoint, parse_common_flags, run_event};
-use crate::error::{Error, ErrorKind, Result};
+use crate::commands::event_records::{CommonFlags, Endpoint, run_event};
 use crate::output::Renderable;
 use crate::runtime::ApiContext;
 use crate::schema_cmd::{Arg, Command, OutputField};
@@ -13,30 +12,12 @@ pub struct Args {
     pub flags: CommonFlags,
 }
 
-pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let (positional, flags) = parse_common_flags(rest, false, "marriages")?;
-    if positional.len() != 2 {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!(
-                "marriages: expected <name1> <name2>, got {} positional argument(s)",
-                positional.len()
-            ),
-        ));
-    }
-    Ok(Args {
-        name1: positional[0].clone(),
-        name2: positional[1].clone(),
-        flags,
-    })
-}
-
 pub fn run(
     client: &Client,
     cache: Option<&Cache>,
     ctx: &ApiContext,
     args: &Args,
-) -> Result<Renderable> {
+) -> Result<Renderable, crate::error::Error> {
     run_event(
         Endpoint {
             command_name: "marriages",
@@ -145,74 +126,5 @@ pub fn schema() -> Command {
                 ty: "boolean",
             },
         ],
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::error::ErrorKind;
-
-    fn strs(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn two_positionals_ok() {
-        let a = parse_rest(&strs(&["Jan", "Anna"])).unwrap();
-        assert_eq!(a.name1, "Jan");
-        assert_eq!(a.name2, "Anna");
-    }
-
-    #[test]
-    fn one_positional_is_validation_error() {
-        let err = parse_rest(&strs(&["Jan"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("marriages"));
-    }
-
-    #[test]
-    fn three_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&["Jan", "Anna", "extra"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("marriages"));
-    }
-
-    #[test]
-    fn zero_positionals_is_validation_error() {
-        let err = parse_rest(&[]).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("marriages"));
-    }
-
-    #[test]
-    fn event_province_rejected() {
-        let err = parse_rest(&strs(&["Jan", "Anna", "--event-province=ZH"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("--event-province"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn event_year_eq_form_parses() {
-        let a = parse_rest(&strs(&["Jan", "Anna", "--event-year=1900"])).unwrap();
-        assert_eq!(a.flags.event_year, Some(1900));
-    }
-
-    #[test]
-    fn event_year_non_integer_is_validation_error() {
-        let err = parse_rest(&strs(&["Jan", "Anna", "--event-year=abc"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--event-year"));
-    }
-
-    #[test]
-    fn unknown_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["Jan", "Anna", "--unknown"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--unknown"));
     }
 }

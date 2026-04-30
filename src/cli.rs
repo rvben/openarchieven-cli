@@ -50,7 +50,7 @@ pub enum Cmd {
     /// Death-event records.
     Deaths(DeathsArgs),
     /// Marriage-event records.
-    Marriages(ApiArgs),
+    Marriages(MarriagesArgs),
     /// Anniversary records.
     Yearsago(ApiArgs),
     /// List archives.
@@ -193,6 +193,29 @@ pub struct DeathsArgs {
     #[arg(long)]
     pub event_year: Option<i32>,
     /// Filter by place of death.
+    #[arg(long)]
+    pub event_place: Option<String>,
+}
+
+const MARRIAGES_EXAMPLES: &str = "\
+Examples:
+  openarchieven marriages \"Pieter Jansen\" \"Anna de Vries\" --event-year 1925
+  openarchieven marriages \"Hendriks\" \"Bakker\" --event-place Utrecht --limit 25
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = MARRIAGES_EXAMPLES)]
+pub struct MarriagesArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// First partner's name.
+    pub name1: String,
+    /// Second partner's name.
+    pub name2: String,
+    /// Filter by year of marriage (YYYY).
+    #[arg(long)]
+    pub event_year: Option<i32>,
+    /// Filter by place of marriage.
     #[arg(long)]
     pub event_place: Option<String>,
 }
