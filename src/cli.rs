@@ -176,7 +176,7 @@ pub struct MatchArgs {
     /// Person name to match.
     pub name: String,
     /// Birth year (YYYY).
-    pub birth_year: i32,
+    pub birthyear: i32,
 }
 
 const SEARCH_EXAMPLES: &str = "\

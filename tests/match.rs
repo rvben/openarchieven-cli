@@ -69,7 +69,7 @@ fn match_returns_list_non_paginated() {
         &ctx(),
         &match_record::Args {
             name: "Jan Jansen".into(),
-            birth_year: 1850,
+            birthyear: 1850,
         },
     )
     .unwrap();
@@ -98,7 +98,7 @@ fn match_rejects_limit() {
         &ctx,
         &match_record::Args {
             name: "Jan Jansen".into(),
-            birth_year: 1850,
+            birthyear: 1850,
         },
     )
     .unwrap_err();
@@ -124,7 +124,7 @@ fn match_rejects_unknown_lang() {
         &ctx,
         &match_record::Args {
             name: "Jan Jansen".into(),
-            birth_year: 1850,
+            birthyear: 1850,
         },
     )
     .unwrap_err();
@@ -155,7 +155,7 @@ fn match_handles_empty_docs() {
         &ctx(),
         &match_record::Args {
             name: "nobody".into(),
-            birth_year: 1850,
+            birthyear: 1850,
         },
     )
     .unwrap();

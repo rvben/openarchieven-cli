@@ -12,7 +12,7 @@ const SUPPORTED_LANGS: &[&str] = &["nl", "en"];
 #[derive(Debug, Clone, Default)]
 pub struct Args {
     pub name: String,
-    pub birth_year: i32,
+    pub birthyear: i32,
 }
 
 pub fn run(
@@ -37,7 +37,7 @@ pub fn run(
         ));
     }
 
-    let yr = args.birth_year.to_string();
+    let yr = args.birthyear.to_string();
     let params: Vec<(&str, &str)> = vec![
         ("name", args.name.as_str()),
         ("birth_year", yr.as_str()),

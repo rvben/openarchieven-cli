@@ -123,10 +123,10 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let openarchieven::cli::MatchArgs {
                 global: global_api,
                 name,
-                birth_year,
+                birthyear,
             } = args;
             run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
-                let typed = openarchieven::commands::match_record::Args { name, birth_year };
+                let typed = openarchieven::commands::match_record::Args { name, birthyear };
                 openarchieven::commands::match_record::run(client, cache, ctx, &typed)
             })
         }
