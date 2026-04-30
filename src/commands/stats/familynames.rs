@@ -113,16 +113,49 @@ pub fn run(
 
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
     let body = client.get_cached("/stats/familynames.json", &params, ttl, cache)?;
-    let items = body
-        .pointer("/familynames")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let items = flatten_google_charts(&body);
     let total = items.len() as u64;
     Ok(
         Renderable::list(serde_json::Value::Array(items), false, Some(limit), None)
             .with_total(Some(total)),
     )
+}
+
+/// Convert a Google-Charts-style `{cols:[{id,label,type}], rows:[{c:[{v}]}]}`
+/// payload into a flat list of records keyed by `cols[i].id`. Cells with
+/// no `v` become `null`. Falls back to `body["familynames"]` if the legacy
+/// wrapped shape is encountered.
+fn flatten_google_charts(body: &serde_json::Value) -> Vec<serde_json::Value> {
+    if let Some(legacy) = body.pointer("/familynames").and_then(|v| v.as_array()) {
+        return legacy.clone();
+    }
+    let Some(cols) = body.pointer("/cols").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+    let Some(rows) = body.pointer("/rows").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+    let keys: Vec<&str> = cols
+        .iter()
+        .map(|c| c.get("id").and_then(|v| v.as_str()).unwrap_or(""))
+        .collect();
+    rows.iter()
+        .map(|row| {
+            let cells = row.pointer("/c").and_then(|v| v.as_array());
+            let mut obj = serde_json::Map::new();
+            if let Some(cells) = cells {
+                for (i, cell) in cells.iter().enumerate() {
+                    let key = keys.get(i).copied().unwrap_or("");
+                    if key.is_empty() {
+                        continue;
+                    }
+                    let val = cell.get("v").cloned().unwrap_or(serde_json::Value::Null);
+                    obj.insert(key.to_string(), val);
+                }
+            }
+            serde_json::Value::Object(obj)
+        })
+        .collect()
 }
 
 pub fn parse_rest(rest: &[String]) -> Result<Args> {
@@ -440,5 +473,34 @@ mod tests {
         let et = cmd.args.iter().find(|a| a.name == "--event-type").unwrap();
         assert!(et.r#enum.is_some());
         assert_eq!(et.r#enum.as_ref().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn flatten_google_charts_basic() {
+        let body = serde_json::json!({
+            "cols": [{"id":"name"},{"id":"count"}],
+            "rows": [
+                {"c":[{"v":"Jansen"},{"v":42}]},
+                {"c":[{"v":"Vries"},{"v":31}]},
+            ]
+        });
+        let out = flatten_google_charts(&body);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0]["name"], "Jansen");
+        assert_eq!(out[1]["count"], 31);
+    }
+
+    #[test]
+    fn flatten_google_charts_legacy_wrapped() {
+        let body = serde_json::json!({"familynames": [{"name":"X"}]});
+        let out = flatten_google_charts(&body);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["name"], "X");
+    }
+
+    #[test]
+    fn flatten_google_charts_empty_input() {
+        let body = serde_json::json!({"cols":[],"rows":[]});
+        assert!(flatten_google_charts(&body).is_empty());
     }
 }

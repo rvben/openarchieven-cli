@@ -56,7 +56,13 @@ fn familynames_paginates_with_filters() {
             .and(query_param("number_show", "20"))
             .and(query_param("lang", "en"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "familynames": [{"name": "Jansen", "count": 42}]
+                "cols": [
+                    {"id": "name", "label": "Achternaam", "type": "string"},
+                    {"id": "count", "label": "Aantal", "type": "number"}
+                ],
+                "rows": [
+                    {"c": [{"v": "Jansen"}, {"v": 42}]}
+                ]
             })))
             .mount(&server)
             .await;
@@ -86,6 +92,9 @@ fn familynames_paginates_with_filters() {
     assert_eq!(r.shape, Shape::List);
     assert_eq!(r.total, Some(1));
     assert_eq!(r.limit, Some(20));
+    let env = r.list_envelope(r.total);
+    assert_eq!(env["items"][0]["name"], "Jansen");
+    assert_eq!(env["items"][0]["count"], 42);
 }
 
 #[test]
@@ -96,7 +105,7 @@ fn familynames_default_limit_is_20() {
         Mock::given(method("GET"))
             .and(path("/stats/familynames.json"))
             .and(query_param("number_show", "20"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"familynames": []})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"cols":[],"rows":[]})))
             .mount(&server)
             .await;
     });
