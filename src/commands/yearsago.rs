@@ -84,7 +84,7 @@ pub fn run(
 }
 
 fn resolve_yearsago(today: NaiveDate, years: u32) -> NaiveDate {
-    let target_year = today.year() - years as i32;
+    let target_year = today.year().saturating_sub(years as i32);
     NaiveDate::from_ymd_opt(target_year, today.month(), today.day())
         .or_else(|| NaiveDate::from_ymd_opt(target_year, today.month(), 28))
         .unwrap_or(today)
@@ -147,6 +147,12 @@ mod tests {
         let today = NaiveDate::from_ymd_opt(2026, 4, 30).unwrap();
         let r = resolve_yearsago(today, 100);
         assert_eq!(r, NaiveDate::from_ymd_opt(1926, 4, 30).unwrap());
+    }
+
+    #[test]
+    fn resolve_yearsago_zero_returns_today() {
+        let today = NaiveDate::from_ymd_opt(2026, 4, 30).unwrap();
+        assert_eq!(resolve_yearsago(today, 0), today);
     }
 
     #[test]
