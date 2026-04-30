@@ -1,0 +1,796 @@
+//! End-to-end dispatch coverage for `main.rs`.
+//!
+//! Drives every top-level subcommand against a wiremock server via
+//! `OPENARCHIEVEN_BASE_URL`. Each test asserts both sides of the wire:
+//!
+//! * The **request** side via `query_param` matchers — wiremock returns 404
+//!   unless the query string carries the expected key/value pairs, so a
+//!   regression in argument-to-param mapping fails the test.
+//! * The **response** side by parsing stdout as JSON and asserting on the
+//!   envelope or scalar fields.
+
+use std::time::Duration;
+
+use assert_cmd::Command;
+use serde_json::{Value, json};
+use tempfile::TempDir;
+use wiremock::matchers::{method, path, query_param};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+fn rt() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+}
+
+struct Env {
+    rt: tokio::runtime::Runtime,
+    server: MockServer,
+    cache: TempDir,
+}
+
+impl Env {
+    fn new() -> Self {
+        let rt = rt();
+        let server = rt.block_on(MockServer::start());
+        let cache = tempfile::tempdir().unwrap();
+        Self { rt, server, cache }
+    }
+
+    fn mount_get(&self, p: &'static str, body: Value) {
+        self.rt.block_on(async {
+            Mock::given(method("GET"))
+                .and(path(p))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(&self.server)
+                .await;
+        });
+    }
+
+    /// Mount a 200-with-`body` mock that matches only when the request carries
+    /// every `(key, value)` in `params`. Other paths/queries miss this mock.
+    fn mount_get_with_params(&self, p: &'static str, params: &[(&'static str, &str)], body: Value) {
+        self.rt.block_on(async {
+            let mut mock = Mock::given(method("GET")).and(path(p));
+            for (k, v) in params {
+                mock = mock.and(query_param(*k, *v));
+            }
+            mock.respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(&self.server)
+                .await;
+        });
+    }
+
+    fn mount_status(&self, p: &'static str, status: u16) {
+        self.rt.block_on(async {
+            Mock::given(method("GET"))
+                .and(path(p))
+                .respond_with(ResponseTemplate::new(status))
+                .mount(&self.server)
+                .await;
+        });
+    }
+
+    fn mount_status_after(&self, p: &'static str, status: u16, after: Duration) {
+        self.rt.block_on(async {
+            Mock::given(method("GET"))
+                .and(path(p))
+                .respond_with(ResponseTemplate::new(status).set_delay(after))
+                .mount(&self.server)
+                .await;
+        });
+    }
+
+    fn received_request_count(&self) -> usize {
+        self.rt
+            .block_on(self.server.received_requests())
+            .map(|v| v.len())
+            .unwrap_or(0)
+    }
+
+    fn cmd(&self) -> Command {
+        let mut c = Command::cargo_bin("openarchieven").unwrap();
+        c.env("OPENARCHIEVEN_BASE_URL", self.server.uri())
+            .env("OPENARCHIEVEN_CACHE_DIR", self.cache.path())
+            .env("OPENARCHIEVEN_RATE_LIMIT", "1000")
+            // Avoid bleed from the user's actual env.
+            .env_remove("NO_COLOR")
+            .env_remove("OPENARCHIEVEN_OUTPUT")
+            .env_remove("OPENARCHIEVEN_CACHE_DISABLE");
+        c
+    }
+}
+
+fn last_json_line(stderr: &[u8]) -> Value {
+    let s = String::from_utf8_lossy(stderr);
+    let last = s.lines().last().expect("stderr non-empty");
+    serde_json::from_str(last).expect("last stderr line is JSON")
+}
+
+fn parse_stdout_json(out: &[u8]) -> Value {
+    let s = String::from_utf8_lossy(out);
+    serde_json::from_str(s.trim()).expect("stdout is JSON")
+}
+
+// ---------------------------------------------------------------------------
+// Each top-level subcommand below verifies the request-side parameter
+// mapping (via query_param matchers) and the response-side rendering.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn search_dispatch_sends_name_and_renders_json() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({
+            "response": {"numFound": 1, "docs": [{"id": "r-1"}]}
+        }),
+    );
+    let out = env.cmd().args(["search", "jansen"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "r-1");
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["paginated"], true);
+}
+
+#[test]
+fn search_with_fields_filters_keys() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({
+            "response": {"numFound": 1, "docs": [{"id": "r-1", "name": "Jan"}]}
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["search", "--fields", "id", "jansen"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    let item = v["items"][0].as_object().unwrap();
+    assert_eq!(item.len(), 1);
+    assert_eq!(item["id"], "r-1");
+    assert!(!item.contains_key("name"));
+}
+
+#[test]
+fn search_with_unknown_fields_is_validation() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({
+            "response": {"numFound": 1, "docs": [{"id": "r-1"}]}
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["search", "--fields", "totally_made_up", "jansen"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "validation");
+    assert!(
+        v["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("totally_made_up")
+    );
+}
+
+#[test]
+fn show_dispatch_sends_archive_and_identifier() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/show.json",
+        &[
+            ("archive_code", "elo"),
+            ("identifier", "abc"),
+            ("lang", "nl"),
+        ],
+        json!({"record": {"id": "abc", "person": {"name": "Jan"}}}),
+    );
+    let out = env.cmd().args(["show", "elo", "abc"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["record"]["id"], "abc");
+    assert_eq!(v["record"]["person"]["name"], "Jan");
+}
+
+#[test]
+fn show_404_propagates_not_found_to_stderr() {
+    let env = Env::new();
+    env.mount_status("/records/show.json", 404);
+    let out = env
+        .cmd()
+        .args(["show", "elo", "missing"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "not_found");
+    assert_eq!(out.get_output().status.code(), Some(1));
+}
+
+#[test]
+fn match_dispatch_sends_name_and_birth_year() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/match.json",
+        &[("name", "jansen"), ("birth_year", "1900"), ("lang", "nl")],
+        json!({
+            "response": {"numFound": 1, "docs": [{"id": "m-1", "score": 0.9}]}
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["match", "jansen", "1900"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "m-1");
+    assert_eq!(v["items"][0]["score"], 0.9);
+}
+
+#[test]
+fn births_dispatch_sends_name_and_pagination() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "10"), ("start", "0")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "b-1", "name": "Jan"}]}}),
+    );
+    let out = env.cmd().args(["births", "jansen"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "b-1");
+    assert_eq!(v["total"], 1);
+}
+
+#[test]
+fn deaths_dispatch_sends_name() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getDeaths.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "d-1"}]}}),
+    );
+    let out = env.cmd().args(["deaths", "jansen"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "d-1");
+}
+
+#[test]
+fn marriages_dispatch_sends_both_partner_names() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getMarriages.json",
+        &[("name", "jansen"), ("name2", "pieters")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "m-1", "groom": "Jan"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["marriages", "jansen", "pieters"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "m-1");
+}
+
+#[test]
+fn yearsago_dispatch_sends_years_param() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/yearsago.json",
+        &[("yearsago", "100"), ("number_show", "10")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "y-1"}]}}),
+    );
+    let out = env.cmd().args(["yearsago", "100"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "y-1");
+}
+
+#[test]
+fn archives_dispatch_renders_list() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/archives.json",
+        json!({"archives": [{"archive_code": "elo", "name": "Eindhoven"}]}),
+    );
+    let out = env.cmd().arg("archives").assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["archive_code"], "elo");
+    assert_eq!(v["items"][0]["name"], "Eindhoven");
+    assert_eq!(v["items"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn census_dispatch_sends_place_and_year() {
+    // Census responses are passed through verbatim as `single-nested` — the API
+    // body is the rendered output.
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/related/census.json",
+        &[("year", "1900"), ("place", "amsterdam")],
+        json!({
+            "year": 1900,
+            "place": "Amsterdam",
+            "response": {"numFound": 1, "docs": [{"id": "c-1"}]},
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["census", "--place", "amsterdam", "--year", "1900"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["year"], 1900);
+    assert_eq!(v["response"]["docs"][0]["id"], "c-1");
+}
+
+#[test]
+fn weather_dispatch_sends_date_and_coordinates() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/related/weather.json",
+        &[
+            ("date", "1900-01-01"),
+            ("latitude", "52.0"),
+            ("longitude", "4.0"),
+            ("lang", "nl"),
+        ],
+        json!({"date": "1900-01-01", "temp": 5.0, "wind": {"speed": 3.0}}),
+    );
+    let out = env
+        .cmd()
+        .args([
+            "weather",
+            "--date",
+            "1900-01-01",
+            "--latitude",
+            "52.0",
+            "--longitude",
+            "4.0",
+        ])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["date"], "1900-01-01");
+    assert_eq!(v["temp"], 5.0);
+    assert_eq!(v["wind"]["speed"], 3.0);
+}
+
+#[test]
+fn stats_records_dispatch_renders_archive_counts() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/records.json",
+        json!({"records": [{"archive_code": "elo", "count": 100}]}),
+    );
+    let out = env.cmd().args(["stats", "records"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["archive_code"], "elo");
+    assert_eq!(v["items"][0]["count"], 100);
+}
+
+#[test]
+fn stats_sources_dispatch_renders_archive_counts() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/sources.json",
+        json!({"sources": [{"archive_code": "elo", "count": 5}]}),
+    );
+    let out = env.cmd().args(["stats", "sources"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["count"], 5);
+}
+
+#[test]
+fn stats_events_dispatch_renders_archive_counts() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/events.json",
+        json!({"events": [{"archive_code": "elo", "count": 10}]}),
+    );
+    let out = env.cmd().args(["stats", "events"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["count"], 10);
+}
+
+#[test]
+fn stats_comments_dispatch_renders_archive_counts() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/comments.json",
+        json!({"comments": [{"archive_code": "elo", "count": 1}]}),
+    );
+    let out = env.cmd().args(["stats", "comments"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["count"], 1);
+}
+
+#[test]
+fn stats_familynames_dispatch_sends_place_param() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/stats/familynames.json",
+        &[("place", "Leiden")],
+        json!({"familynames": [{"familyname": "Jansen", "count": 1234}]}),
+    );
+    let out = env
+        .cmd()
+        .args(["stats", "familynames", "--place", "Leiden"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["familyname"], "Jansen");
+    assert_eq!(v["items"][0]["count"], 1234);
+}
+
+#[test]
+fn stats_firstnames_dispatch_sends_place_and_year() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/stats/firstnames.json",
+        &[("place", "Leiden"), ("year", "1850")],
+        json!({"firstnames": [{"firstname": "Jan", "count": 1000}]}),
+    );
+    let out = env
+        .cmd()
+        .args(["stats", "firstnames", "--place", "Leiden", "--year", "1850"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["firstname"], "Jan");
+}
+
+#[test]
+fn stats_professions_dispatch_sends_place_param() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/stats/professions.json",
+        &[("place", "Leiden")],
+        json!({"professions": [{"profession": "boer", "count": 500}]}),
+    );
+    let out = env
+        .cmd()
+        .args(["stats", "professions", "--place", "Leiden"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["profession"], "boer");
+}
+
+// ---------------------------------------------------------------------------
+// Cache management subcommand dispatch.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cache_info_dispatch_returns_zero_entries() {
+    let env = Env::new();
+    let out = env.cmd().args(["cache", "info"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["entries"], 0);
+    assert_eq!(v["bytes"], 0);
+}
+
+#[test]
+fn cache_clear_with_yes_dispatch_succeeds() {
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .args(["cache", "clear", "--yes"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["deleted"], 0);
+}
+
+#[test]
+fn cache_prune_dispatch_returns_zero_when_empty() {
+    let env = Env::new();
+    let out = env.cmd().args(["cache", "prune"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["deleted"], 0);
+}
+
+// ---------------------------------------------------------------------------
+// Error handling paths in main.rs (emit_error + non-validation exit codes).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn upstream_500_emits_server_error_to_stderr() {
+    let env = Env::new();
+    env.mount_status("/records/search.json", 500);
+    let out = env
+        .cmd()
+        .args(["search", "--no-cache", "x"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "server");
+    assert_eq!(out.get_output().status.code(), Some(1));
+}
+
+#[test]
+fn upstream_400_emits_validation_error_to_stderr() {
+    let env = Env::new();
+    env.rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/search.json"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+                "error_code": "INVALID_PARAM",
+                "error_description": "name is required"
+            })))
+            .mount(&env.server)
+            .await;
+    });
+    let out = env
+        .cmd()
+        .args(["search", "--no-cache", "x"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "validation");
+    assert_eq!(v["error"]["upstream_code"], "INVALID_PARAM");
+    assert_eq!(v["error"]["upstream_message"], "name is required");
+}
+
+#[test]
+fn timeout_emits_timeout_error_to_stderr() {
+    let env = Env::new();
+    env.mount_status_after("/records/search.json", 200, Duration::from_secs(5));
+    let out = env
+        .cmd()
+        .args(["search", "--no-cache", "--timeout", "300ms", "x"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "timeout");
+}
+
+#[test]
+fn error_envelope_has_stable_shape() {
+    // The JSON line on stderr must always be `{"error": {...}}` with at minimum
+    // `kind` and `message` fields. This guards the agent-facing contract.
+    let env = Env::new();
+    env.mount_status("/records/show.json", 404);
+    let out = env
+        .cmd()
+        .args(["show", "elo", "missing"])
+        .assert()
+        .failure();
+    let stderr = out.get_output().stderr.clone();
+    let last_line = String::from_utf8_lossy(&stderr)
+        .lines()
+        .last()
+        .unwrap()
+        .to_string();
+    let v: Value = serde_json::from_str(&last_line).unwrap();
+    let err = v["error"].as_object().expect("error is an object");
+    assert!(err.contains_key("kind"), "missing 'kind' in {err:?}");
+    assert!(err.contains_key("message"), "missing 'message' in {err:?}");
+    assert_eq!(err["kind"], "not_found");
+    // No ANSI escape sequences in the JSON line itself.
+    assert!(
+        !last_line.contains("\x1b["),
+        "JSON line contains ANSI escape: {last_line:?}"
+    );
+}
+
+#[test]
+fn version_subcommand_emits_version_object() {
+    let env = Env::new();
+    let out = env.cmd().arg("version").assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
+fn schema_subcommand_emits_object_with_commands() {
+    let env = Env::new();
+    let out = env.cmd().arg("schema").assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert!(v.is_object(), "schema root is an object");
+    assert!(
+        v["commands"].is_array(),
+        "schema has a 'commands' array, got: {}",
+        serde_json::to_string(&v).unwrap_or_default()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Global flag plumbing (--no-cache, --refresh, --output, --cache-ttl, env vars).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn no_cache_flag_does_not_create_cache_entries() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 0, "docs": []}}),
+    );
+    env.cmd()
+        .args(["search", "--no-cache", "jansen"])
+        .assert()
+        .success();
+    // With --no-cache, the cache directory must be empty of entry files.
+    let entries: Vec<_> = std::fs::read_dir(env.cache.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let n = e.file_name();
+            let s = n.to_string_lossy();
+            s.ends_with(".json") && s.len() == 64 + 5 // 64 hex + ".json"
+        })
+        .collect();
+    assert!(
+        entries.is_empty(),
+        "--no-cache must skip writes; found: {entries:?}"
+    );
+}
+
+#[test]
+fn second_call_is_served_from_cache() {
+    // Default behavior (no --no-cache): the second invocation hits the cache
+    // and never touches the network.
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1"}]}}),
+    );
+    env.cmd().args(["search", "jansen"]).assert().success();
+    let after_first = env.received_request_count();
+    env.cmd().args(["search", "jansen"]).assert().success();
+    let after_second = env.received_request_count();
+    assert_eq!(
+        after_second, after_first,
+        "second call should be served from cache; got {after_first} → {after_second}"
+    );
+}
+
+#[test]
+fn refresh_flag_bypasses_cache_read() {
+    // Pre-populate the cache by running once, then `--refresh` should re-fetch.
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1"}]}}),
+    );
+    env.cmd().args(["search", "jansen"]).assert().success();
+    let after_first = env.received_request_count();
+    env.cmd()
+        .args(["search", "--refresh", "jansen"])
+        .assert()
+        .success();
+    let after_refresh = env.received_request_count();
+    assert_eq!(
+        after_refresh,
+        after_first + 1,
+        "--refresh must hit the network again",
+    );
+}
+
+#[test]
+fn output_table_flag_renders_box_drawing_table() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--output", "table", "search", "x"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout).into_owned();
+    assert!(stdout.contains("r-1"));
+    // The table preset is UTF8_FULL — a real regression to ASCII would lose
+    // these box-drawing characters.
+    assert!(
+        stdout.contains('│') && stdout.contains('─'),
+        "expected box-drawing chars in:\n{stdout}",
+    );
+}
+
+#[test]
+fn output_markdown_flag_emits_pipe_table() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--output", "markdown", "search", "x"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout).into_owned();
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines[0], "| id |");
+    assert_eq!(lines[1], "| --- |");
+    assert_eq!(lines[2], "| r-1 |");
+}
+
+#[test]
+fn cache_disable_env_skips_cache_layer() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 0, "docs": []}}),
+    );
+    // First call with cache disabled.
+    env.cmd()
+        .env("OPENARCHIEVEN_CACHE_DISABLE", "1")
+        .args(["search", "jansen"])
+        .assert()
+        .success();
+    let after_first = env.received_request_count();
+    // Second call also goes to network because cache is disabled.
+    env.cmd()
+        .env("OPENARCHIEVEN_CACHE_DISABLE", "1")
+        .args(["search", "jansen"])
+        .assert()
+        .success();
+    let after_second = env.received_request_count();
+    assert_eq!(
+        after_second,
+        after_first + 1,
+        "OPENARCHIEVEN_CACHE_DISABLE must bypass the cache",
+    );
+}
+
+#[test]
+fn cache_ttl_inf_persists_entry_with_no_expiry() {
+    // `--cache-ttl inf` writes the cache entry with `expires_at: null`.
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 0, "docs": []}}),
+    );
+    env.cmd()
+        .args(["search", "--cache-ttl", "inf", "jansen"])
+        .assert()
+        .success();
+
+    let entries: Vec<_> = std::fs::read_dir(env.cache.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let n = e.file_name();
+            let s = n.to_string_lossy();
+            s.ends_with(".json") && s.len() == 64 + 5
+        })
+        .collect();
+    assert_eq!(entries.len(), 1, "expected exactly one cache entry");
+
+    let body = std::fs::read_to_string(entries[0].path()).unwrap();
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert!(
+        v["expires_at"].is_null(),
+        "--cache-ttl inf must produce expires_at=null, got: {}",
+        v["expires_at"],
+    );
+}
+
+#[test]
+fn no_cache_and_refresh_are_mutually_exclusive() {
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .args(["search", "--no-cache", "--refresh", "jansen"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "validation");
+    let msg = v["error"]["message"].as_str().unwrap();
+    assert!(
+        msg.contains("--no-cache") && msg.contains("--refresh"),
+        "validation message should name both flags: {msg:?}",
+    );
+}
