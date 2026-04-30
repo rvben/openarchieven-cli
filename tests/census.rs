@@ -138,33 +138,6 @@ fn census_rejects_both_place_and_gg_uri() {
 }
 
 #[test]
-fn census_rejects_richness_outside_1_to_3() {
-    let rt = rt();
-    let server = rt.block_on(MockServer::start());
-
-    let dir = tempdir().unwrap();
-    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
-    let client = make_client(&server);
-
-    let err = census::run(
-        &client,
-        Some(&cache),
-        &ctx(),
-        &census::Args {
-            year: 1850,
-            place: Some("Leiden".into()),
-            gg_uri: None,
-            province: None,
-            richness: Some(4),
-        },
-    )
-    .unwrap_err();
-
-    assert_eq!(err.kind(), ErrorKind::Validation);
-    assert!(err.message().contains("--richness"));
-}
-
-#[test]
 fn census_rejects_fields() {
     let rt = rt();
     let server = rt.block_on(MockServer::start());

@@ -1039,6 +1039,62 @@ fn search_rejects_sort_out_of_range() {
 }
 
 #[test]
+fn census_rejects_richness_out_of_range_at_parse() {
+    let dir = tempfile::tempdir().unwrap();
+    for bad in ["--richness=0", "--richness=4"] {
+        let assert = assert_cmd::Command::cargo_bin("openarchieven")
+            .unwrap()
+            .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+            .args(["census", "--year", "1900", "--place", "x", bad])
+            .assert()
+            .failure();
+        let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+        assert!(
+            stderr.contains("--richness"),
+            "expected --richness in rejection for {bad}: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn weather_rejects_invalid_decimal_at_parse() {
+    let dir = tempfile::tempdir().unwrap();
+    let cases: [&[&str]; 2] = [
+        &[
+            "weather",
+            "--date",
+            "1900-01-01",
+            "--latitude",
+            "foo",
+            "--longitude",
+            "4.0",
+        ],
+        &[
+            "weather",
+            "--date",
+            "1900-01-01",
+            "--latitude",
+            "52.0",
+            "--longitude",
+            "bar",
+        ],
+    ];
+    for argv in cases {
+        let assert = assert_cmd::Command::cargo_bin("openarchieven")
+            .unwrap()
+            .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+            .args(argv)
+            .assert()
+            .failure();
+        let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+        assert!(
+            stderr.contains("must be a decimal number"),
+            "expected decimal-rejection error for {argv:?}: {stderr}"
+        );
+    }
+}
+
+#[test]
 fn match_help_shows_real_args_and_examples() {
     let dir = tempfile::tempdir().unwrap();
     let out = assert_cmd::Command::cargo_bin("openarchieven")

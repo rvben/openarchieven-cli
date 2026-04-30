@@ -40,14 +40,6 @@ pub fn run(
             "exactly one of --place or --gg-uri is required",
         ));
     }
-    if let Some(r) = args.richness
-        && !(1..=3).contains(&r)
-    {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!("--richness must be 1, 2, or 3 (got {r})"),
-        ));
-    }
 
     let year_s = args.year.to_string();
     let richness_s = args.richness.map(|r| r.to_string());

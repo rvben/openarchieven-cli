@@ -379,10 +379,10 @@ pub struct MarriagesArgs {
     pub event_place: Option<String>,
 }
 
-/// Catch-all positional + flag holder for endpoint commands. Each command's
-/// `run()` function does its own validation against `args.rest` — clap rejects
-/// nothing here. In later phases each endpoint will graduate to a dedicated
-/// `clap::Args` struct with typed fields.
+/// Catch-all positional + flag holder for the `Stats` sub-subcommands.
+/// Each command's `run()` function validates `args.rest` directly; clap
+/// rejects nothing here. This struct will be removed once every Stats
+/// endpoint has its own typed `clap::Args` struct.
 #[derive(Debug, clap::Args)]
 pub struct ApiArgs {
     /// Per-request timeout (humantime: 30s, 1m, 500ms).
