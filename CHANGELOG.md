@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 
+
+## [0.2.1](https://github.com/rvben/openarchieven-cli/compare/v0.2.0...v0.2.1) - 2026-04-30
+
+### Added
+
+- **cache**: cache immutable lookups forever, extend archives ttl ([beb0523](https://github.com/rvben/openarchieven-cli/commit/beb0523b2ef5cd04f9fd045148eb550ef95cbe4d))
+
 ## [0.2.0](https://github.com/rvben/openarchieven-cli/compare/v0.1.0...v0.2.0) - 2026-04-30
 
 ### Added
