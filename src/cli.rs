@@ -56,7 +56,7 @@ pub enum Cmd {
     /// List archives.
     Archives(ArchivesArgs),
     /// Census records by place/year.
-    Census(ApiArgs),
+    Census(CensusArgs),
     /// Historical weather observations.
     Weather(ApiArgs),
 
@@ -171,6 +171,31 @@ Examples:
 pub struct ArchivesArgs {
     #[command(flatten)]
     pub global: GlobalApiArgs,
+}
+
+const CENSUS_EXAMPLES: &str = "\
+Examples:
+  openarchieven census --place Amsterdam --year 1899
+  openarchieven census --place Rotterdam --year 1909 --richness 3
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = CENSUS_EXAMPLES)]
+pub struct CensusArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Year (YYYY).
+    #[arg(long)]
+    pub year: i32,
+    #[arg(long)]
+    pub place: Option<String>,
+    #[arg(long)]
+    pub gg_uri: Option<String>,
+    #[arg(long)]
+    pub province: Option<String>,
+    /// Detail level: 1, 2, or 3 (3 = most detailed).
+    #[arg(long, value_parser = clap::value_parser!(i32).range(1..=3))]
+    pub richness: Option<i32>,
 }
 
 const MATCH_EXAMPLES: &str = "\

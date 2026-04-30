@@ -203,10 +203,26 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::yearsago::run(client, cache, ctx, &typed)
             })
         }
-        Cmd::Census(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::census::parse_rest(rest)?;
-            openarchieven::commands::census::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::Census(args) => {
+            let openarchieven::cli::CensusArgs {
+                global: global_api,
+                year,
+                place,
+                gg_uri,
+                province,
+                richness,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::census::Args {
+                    year,
+                    place,
+                    gg_uri,
+                    province,
+                    richness,
+                };
+                openarchieven::commands::census::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Weather(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
             let parsed = openarchieven::commands::weather::parse_rest(rest)?;
             openarchieven::commands::weather::run(client, cache, ctx, &parsed)
