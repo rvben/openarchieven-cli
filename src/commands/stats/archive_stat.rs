@@ -42,9 +42,9 @@ pub fn run_archive_stat(
 
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
     let body = client.get_cached(path, &params, ttl, cache)?;
-    let items = match &body {
-        serde_json::Value::Array(arr) => arr.clone(),
-        _ => body
+    let items = match body {
+        serde_json::Value::Array(arr) => arr,
+        other => other
             .pointer(items_pointer)
             .and_then(|v| v.as_array())
             .cloned()

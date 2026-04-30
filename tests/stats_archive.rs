@@ -182,3 +182,34 @@ fn stats_records_rejects_lang_other_than_nl() {
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--lang"));
 }
+
+#[test]
+fn stats_records_tolerates_legacy_wrapped_shape() {
+    // Feed the helper a {"records": [...]} body and confirm the legacy
+    // pointer fallback still extracts items. Mirrors the bare-array case
+    // but exercises the `other => other.pointer(...)` arm.
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/stats/records.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "records": [{"archive": "elo", "count": 1000}]
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let r = records::run(&client, Some(&cache), &ctx(), &ArchiveStatArgs::default()).unwrap();
+
+    assert_eq!(r.shape, Shape::List);
+    assert_eq!(r.total, Some(1));
+    let env = r.list_envelope(r.total);
+    assert_eq!(env["total"], 1);
+    assert_eq!(env["paginated"], false);
+    assert_eq!(env["items"][0]["archive"], "elo");
+}
