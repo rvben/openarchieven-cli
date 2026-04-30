@@ -121,9 +121,9 @@ pub fn schema() -> Command {
                 min: Some(1),
                 max: Some(3),
                 r#enum: Some(vec![
-                    serde_json::json!(1),
-                    serde_json::json!(2),
-                    serde_json::json!(3),
+                    serde_json::json!({"value": 1, "label": "basic", "description": "Basic information and population number"}),
+                    serde_json::json!({"value": 2, "label": "full", "description": "Like basic, plus all available census data"}),
+                    serde_json::json!({"value": 3, "label": "aggregated", "description": "Like full, plus aggregated data about provinces"}),
                 ]),
             },
         ],

@@ -1,6 +1,5 @@
 ---
 source: tests/schema.rs
-assertion_line: 12
 expression: s
 ---
 {
@@ -106,18 +105,66 @@ expression: s
           "positional": false,
           "default": 1,
           "enum": [
-            -6,
-            -5,
-            -4,
-            -3,
-            -2,
-            -1,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6
+            {
+              "description": "Sort by source descending",
+              "label": "source_desc",
+              "value": -6
+            },
+            {
+              "description": "Sort by place descending",
+              "label": "place_desc",
+              "value": -5
+            },
+            {
+              "description": "Sort by date descending",
+              "label": "date_desc",
+              "value": -4
+            },
+            {
+              "description": "Sort by event type descending",
+              "label": "event_desc",
+              "value": -3
+            },
+            {
+              "description": "Sort by role descending",
+              "label": "role_desc",
+              "value": -2
+            },
+            {
+              "description": "Sort by name descending",
+              "label": "name_desc",
+              "value": -1
+            },
+            {
+              "description": "Sort by name ascending (default)",
+              "label": "name_asc",
+              "value": 1
+            },
+            {
+              "description": "Sort by role ascending",
+              "label": "role_asc",
+              "value": 2
+            },
+            {
+              "description": "Sort by event type ascending",
+              "label": "event_asc",
+              "value": 3
+            },
+            {
+              "description": "Sort by date ascending",
+              "label": "date_asc",
+              "value": 4
+            },
+            {
+              "description": "Sort by place ascending",
+              "label": "place_asc",
+              "value": 5
+            },
+            {
+              "description": "Sort by source ascending",
+              "label": "source_asc",
+              "value": 6
+            }
           ]
         },
         {
@@ -577,9 +624,21 @@ expression: s
           "min": 1,
           "max": 3,
           "enum": [
-            1,
-            2,
-            3
+            {
+              "description": "Basic information and population number",
+              "label": "basic",
+              "value": 1
+            },
+            {
+              "description": "Like basic, plus all available census data",
+              "label": "full",
+              "value": 2
+            },
+            {
+              "description": "Like full, plus aggregated data about provinces",
+              "label": "aggregated",
+              "value": 3
+            }
           ]
         }
       ],
@@ -808,11 +867,31 @@ expression: s
           "required": false,
           "positional": false,
           "enum": [
-            0,
-            1,
-            2,
-            3,
-            6
+            {
+              "description": "All event types",
+              "label": "all",
+              "value": 0
+            },
+            {
+              "description": "Geboorte",
+              "label": "birth",
+              "value": 1
+            },
+            {
+              "description": "Overlijden",
+              "label": "death",
+              "value": 2
+            },
+            {
+              "description": "Huwelijk",
+              "label": "marriage",
+              "value": 3
+            },
+            {
+              "description": "Other registrations",
+              "label": "other",
+              "value": 6
+            }
           ]
         },
         {

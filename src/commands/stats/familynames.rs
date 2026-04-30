@@ -200,11 +200,11 @@ pub fn schema() -> Command {
                 min: None,
                 max: None,
                 r#enum: Some(vec![
-                    serde_json::json!(0),
-                    serde_json::json!(1),
-                    serde_json::json!(2),
-                    serde_json::json!(3),
-                    serde_json::json!(6),
+                    serde_json::json!({"value": 0, "label": "all", "description": "All event types"}),
+                    serde_json::json!({"value": 1, "label": "birth", "description": "Geboorte"}),
+                    serde_json::json!({"value": 2, "label": "death", "description": "Overlijden"}),
+                    serde_json::json!({"value": 3, "label": "marriage", "description": "Huwelijk"}),
+                    serde_json::json!({"value": 6, "label": "other", "description": "Other registrations"}),
                 ]),
             },
             Arg {
