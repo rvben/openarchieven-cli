@@ -113,7 +113,7 @@ pub fn run(
 
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
     let body = client.get_cached("/stats/familynames.json", &params, ttl, cache)?;
-    let items = flatten_google_charts(&body);
+    let items = decode_familynames_response(&body);
     let total = items.len() as u64;
     Ok(
         Renderable::list(serde_json::Value::Array(items), false, Some(limit), None)
@@ -121,11 +121,13 @@ pub fn run(
     )
 }
 
-/// Convert a Google-Charts-style `{cols:[{id,label,type}], rows:[{c:[{v}]}]}`
-/// payload into a flat list of records keyed by `cols[i].id`. Cells with
-/// no `v` become `null`. Falls back to `body["familynames"]` if the legacy
-/// wrapped shape is encountered.
-fn flatten_google_charts(body: &serde_json::Value) -> Vec<serde_json::Value> {
+/// Decode the upstream `/stats/familynames.json` response.
+///
+/// Modern responses use a Google-Charts-style `{cols:[{id,label,type}], rows:[{c:[{v}]}]}`
+/// payload; flatten into a list of records keyed by `cols[i].id`. Cells with no
+/// `v` become `null`. Falls back to the legacy `{"familynames": [...]}` wrapped
+/// shape if encountered.
+fn decode_familynames_response(body: &serde_json::Value) -> Vec<serde_json::Value> {
     if let Some(legacy) = body.pointer("/familynames").and_then(|v| v.as_array()) {
         return legacy.clone();
     }
@@ -476,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn flatten_google_charts_basic() {
+    fn decode_familynames_response_basic() {
         let body = serde_json::json!({
             "cols": [{"id":"name"},{"id":"count"}],
             "rows": [
@@ -484,23 +486,36 @@ mod tests {
                 {"c":[{"v":"Vries"},{"v":31}]},
             ]
         });
-        let out = flatten_google_charts(&body);
+        let out = decode_familynames_response(&body);
         assert_eq!(out.len(), 2);
         assert_eq!(out[0]["name"], "Jansen");
+        assert_eq!(out[0]["count"], 42);
+        assert_eq!(out[1]["name"], "Vries");
         assert_eq!(out[1]["count"], 31);
     }
 
     #[test]
-    fn flatten_google_charts_legacy_wrapped() {
+    fn decode_familynames_response_legacy_wrapped() {
         let body = serde_json::json!({"familynames": [{"name":"X"}]});
-        let out = flatten_google_charts(&body);
+        let out = decode_familynames_response(&body);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0]["name"], "X");
     }
 
     #[test]
-    fn flatten_google_charts_empty_input() {
+    fn decode_familynames_response_empty_input() {
         let body = serde_json::json!({"cols":[],"rows":[]});
-        assert!(flatten_google_charts(&body).is_empty());
+        assert!(decode_familynames_response(&body).is_empty());
+    }
+
+    #[test]
+    fn decode_familynames_response_missing_v_becomes_null() {
+        let body = serde_json::json!({
+            "cols": [{"id":"name"},{"id":"count"}],
+            "rows": [{"c":[{"v":"Jansen"},{}]}]
+        });
+        let out = decode_familynames_response(&body);
+        assert_eq!(out[0]["name"], "Jansen");
+        assert_eq!(out[0]["count"], serde_json::Value::Null);
     }
 }
