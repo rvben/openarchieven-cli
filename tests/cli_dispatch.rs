@@ -1014,6 +1014,28 @@ fn search_rejects_sort_zero_at_argument_parse() {
         .failure();
     let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
     assert!(stderr.contains("--sort"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("must be in -6..=-1 or 1..=6"),
+        "expected range error in stderr: {stderr}"
+    );
+}
+
+#[test]
+fn search_rejects_sort_out_of_range() {
+    let dir = tempfile::tempdir().unwrap();
+    for bad in ["--sort=7", "--sort=-7"] {
+        let assert = assert_cmd::Command::cargo_bin("openarchieven")
+            .unwrap()
+            .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+            .args(["search", "jansen", bad])
+            .assert()
+            .failure();
+        let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+        assert!(
+            stderr.contains("must be in -6..=-1 or 1..=6"),
+            "expected range error for {bad}: {stderr}"
+        );
+    }
 }
 
 #[test]
