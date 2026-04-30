@@ -1236,107 +1236,47 @@ fn census_help_shows_real_args_and_examples() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn stats_records_help_shows_real_args_and_examples() {
-    let dir = tempfile::tempdir().unwrap();
-    let out = assert_cmd::Command::cargo_bin("openarchieven")
-        .unwrap()
-        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
-        .env_remove("NO_COLOR")
-        .args(["stats", "records", "--help"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&out);
-    assert!(s.contains("--archive"), "help must show --archive: {s}");
-    assert!(
-        s.contains("Examples:"),
-        "help must have Examples block: {s}"
-    );
-    assert!(
-        s.contains("sort_by"),
-        "Examples must include jq example: {s}"
-    );
-    assert!(
-        !s.contains("[REST]..."),
-        "stale REST placeholder visible: {s}"
-    );
-}
-
-#[test]
-fn stats_sources_help_shows_real_args_and_examples() {
-    let dir = tempfile::tempdir().unwrap();
-    let out = assert_cmd::Command::cargo_bin("openarchieven")
-        .unwrap()
-        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
-        .env_remove("NO_COLOR")
-        .args(["stats", "sources", "--help"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&out);
-    assert!(s.contains("--archive"), "help must show --archive: {s}");
-    assert!(
-        s.contains("Examples:"),
-        "help must have Examples block: {s}"
-    );
-    assert!(
-        !s.contains("[REST]..."),
-        "stale REST placeholder visible: {s}"
-    );
-}
-
-#[test]
-fn stats_events_help_shows_real_args_and_examples() {
-    let dir = tempfile::tempdir().unwrap();
-    let out = assert_cmd::Command::cargo_bin("openarchieven")
-        .unwrap()
-        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
-        .env_remove("NO_COLOR")
-        .args(["stats", "events", "--help"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&out);
-    assert!(s.contains("--archive"), "help must show --archive: {s}");
-    assert!(
-        s.contains("Examples:"),
-        "help must have Examples block: {s}"
-    );
-    assert!(
-        !s.contains("[REST]..."),
-        "stale REST placeholder visible: {s}"
-    );
-}
-
-#[test]
-fn stats_comments_help_shows_real_args_and_examples() {
-    let dir = tempfile::tempdir().unwrap();
-    let out = assert_cmd::Command::cargo_bin("openarchieven")
-        .unwrap()
-        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
-        .env_remove("NO_COLOR")
-        .args(["stats", "comments", "--help"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&out);
-    assert!(s.contains("--archive"), "help must show --archive: {s}");
-    assert!(
-        s.contains("Examples:"),
-        "help must have Examples block: {s}"
-    );
-    assert!(
-        !s.contains("[REST]..."),
-        "stale REST placeholder visible: {s}"
-    );
+fn stats_archive_subcommands_help_shows_real_args_and_examples() {
+    // Table-driven: (subcommand, expect_sort_by).
+    // records has a `sort_by` jq example; the other three do not.
+    let cases = [
+        ("records", true),
+        ("sources", false),
+        ("events", false),
+        ("comments", false),
+    ];
+    for (subcmd, expect_sort_by) in cases {
+        let dir = tempfile::tempdir().unwrap();
+        let out = assert_cmd::Command::cargo_bin("openarchieven")
+            .unwrap()
+            .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+            .env_remove("NO_COLOR")
+            .args(["stats", subcmd, "--help"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let s = String::from_utf8_lossy(&out);
+        assert!(
+            s.contains("--archive"),
+            "{subcmd}: help must show --archive: {s}"
+        );
+        assert!(
+            s.contains("Examples:"),
+            "{subcmd}: help must have Examples block: {s}"
+        );
+        assert!(
+            !s.contains("[REST]..."),
+            "{subcmd}: stale REST placeholder visible: {s}"
+        );
+        if expect_sort_by {
+            assert!(
+                s.contains("sort_by"),
+                "{subcmd}: Examples must include jq sort_by example: {s}"
+            );
+        }
+    }
 }
 
 #[test]

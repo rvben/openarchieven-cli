@@ -8,7 +8,6 @@ use crate::runtime::{ApiContext, resolve_ttl};
 use crate::schema_cmd::{Arg, Command, OutputField};
 
 const SUPPORTED_LANGS: &[&str] = &["nl", "en", "de", "fr"];
-const VALID_EVENT_TYPES: &[i32] = &[0, 1, 2, 3, 6];
 const MIN_YEAR: i32 = 1500;
 const MAX_YEAR: i32 = 1960;
 const MAX_LIMIT: u32 = 100;
@@ -65,14 +64,6 @@ pub fn run(
         return Err(Error::new(
             ErrorKind::Validation,
             format!("--year-start ({s}) must be <= --year-end ({e})"),
-        ));
-    }
-    if let Some(et) = args.event_type
-        && !VALID_EVENT_TYPES.contains(&et)
-    {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!("--event-type must be one of {VALID_EVENT_TYPES:?}, got {et}"),
         ));
     }
     let limit = match ctx.limit {

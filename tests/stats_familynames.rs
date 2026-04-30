@@ -167,30 +167,6 @@ fn familynames_rejects_year_end_above_range() {
 }
 
 #[test]
-fn familynames_rejects_unknown_event_type() {
-    let rt = rt();
-    let server = rt.block_on(MockServer::start());
-
-    let dir = tempdir().unwrap();
-    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
-    let client = make_client(&server);
-
-    let err = familynames::run(
-        &client,
-        Some(&cache),
-        &ctx(),
-        &familynames::Args {
-            event_type: Some(4),
-            ..Default::default()
-        },
-    )
-    .unwrap_err();
-
-    assert_eq!(err.kind(), ErrorKind::Validation);
-    assert!(err.message().contains("--event-type"));
-}
-
-#[test]
 fn familynames_rejects_year_start_after_end() {
     let rt = rt();
     let server = rt.block_on(MockServer::start());

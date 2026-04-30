@@ -90,10 +90,13 @@ pub enum StatsCmd {
     #[command(after_help = STATS_COMMENTS_EXAMPLES)]
     Comments(StatsArchiveArgs),
     /// Family-name frequency stats.
+    #[command(after_help = STATS_FAMILYNAMES_EXAMPLES)]
     Familynames(StatsFamilynamesArgs),
     /// First-name frequency stats.
+    #[command(after_help = STATS_FIRSTNAMES_EXAMPLES)]
     Firstnames(StatsFirstnamesArgs),
     /// Profession frequency stats.
+    #[command(after_help = STATS_PROFESSIONS_EXAMPLES)]
     Professions(StatsProfessionsArgs),
 }
 
@@ -424,8 +427,19 @@ Examples:
   openarchieven -o json stats familynames --place Utrecht --year-start 1850 --year-end 1900 | jq '.items[0:10]'
 ";
 
+fn parse_event_type(s: &str) -> std::result::Result<i32, String> {
+    match s.parse::<i32>() {
+        Ok(v @ (0 | 1 | 2 | 3 | 6)) => Ok(v),
+        Ok(v) => Err(format!(
+            "'{v}' is not a valid event type (allowed: 0, 1, 2, 3, 6)"
+        )),
+        Err(_) => Err(format!(
+            "'{s}' is not a valid event type (allowed: 0, 1, 2, 3, 6)"
+        )),
+    }
+}
+
 #[derive(Debug, clap::Args)]
-#[command(after_help = STATS_FAMILYNAMES_EXAMPLES)]
 pub struct StatsFamilynamesArgs {
     #[command(flatten)]
     pub global: GlobalApiArgs,
@@ -436,8 +450,8 @@ pub struct StatsFamilynamesArgs {
     #[arg(long)]
     pub year_end: Option<i32>,
     /// Event-type filter: 0 (all), 1 (birth), 2 (death), 3 (marriage), 6 (other).
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(["0","1","2","3","6"]))]
-    pub event_type: Option<String>,
+    #[arg(long, value_parser = parse_event_type)]
+    pub event_type: Option<i32>,
 }
 
 const STATS_FIRSTNAMES_EXAMPLES: &str = "\
@@ -447,7 +461,6 @@ Examples:
 ";
 
 #[derive(Debug, clap::Args)]
-#[command(after_help = STATS_FIRSTNAMES_EXAMPLES)]
 pub struct StatsFirstnamesArgs {
     #[command(flatten)]
     pub global: GlobalApiArgs,
@@ -464,7 +477,6 @@ Examples:
 ";
 
 #[derive(Debug, clap::Args)]
-#[command(after_help = STATS_PROFESSIONS_EXAMPLES)]
 pub struct StatsProfessionsArgs {
     #[command(flatten)]
     pub global: GlobalApiArgs,
@@ -474,52 +486,4 @@ pub struct StatsProfessionsArgs {
     pub year_start: Option<i32>,
     #[arg(long)]
     pub year_end: Option<i32>,
-}
-
-/// Catch-all positional + flag holder for the `Stats` sub-subcommands.
-/// Each command's `run()` function validates `args.rest` directly; clap
-/// rejects nothing here. This struct will be removed once every Stats
-/// endpoint has its own typed `clap::Args` struct.
-#[derive(Debug, clap::Args)]
-pub struct ApiArgs {
-    /// Per-request timeout (humantime: 30s, 1m, 500ms).
-    #[arg(global = true, long, value_parser = humantime::parse_duration)]
-    pub timeout: Option<Duration>,
-
-    /// Bypass cache read AND write for this invocation.
-    #[arg(global = true, long)]
-    pub no_cache: bool,
-
-    /// Bypass cache read; still write.
-    #[arg(global = true, long)]
-    pub refresh: bool,
-
-    /// Override cache TTL for this invocation. `inf` = never expire.
-    #[arg(global = true, long)]
-    pub cache_ttl: Option<String>,
-
-    /// Override cache directory.
-    #[arg(global = true, long, env = "OPENARCHIEVEN_CACHE_DIR")]
-    pub cache_dir: Option<PathBuf>,
-
-    /// Top-level field projection (comma-separated).
-    #[arg(global = true, long)]
-    pub fields: Option<String>,
-
-    /// Pagination limit (where supported).
-    #[arg(global = true, long)]
-    pub limit: Option<u32>,
-
-    /// Pagination offset (where supported).
-    #[arg(global = true, long)]
-    pub offset: Option<u32>,
-
-    /// Response language.
-    #[arg(global = true, long)]
-    pub lang: Option<String>,
-
-    /// All remaining positional + flag arguments are deferred to the
-    /// command's own validator.
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-    pub rest: Vec<String>,
 }

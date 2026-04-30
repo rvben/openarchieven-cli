@@ -306,8 +306,7 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                     place,
                     year_start,
                     year_end,
-                    event_type: event_type
-                        .map(|s| s.parse::<i32>().expect("clap restricts to valid integers")),
+                    event_type,
                 };
                 openarchieven::commands::stats::familynames::run(client, cache, ctx, &typed)
             })
