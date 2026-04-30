@@ -71,6 +71,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn is_tty_does_not_panic_for_stdout() {
+        // We can't assert the return value (depends on the test runner's TTY
+        // state), but calling it must not panic.
+        let _ = is_tty(Stream::Stdout);
+    }
+
+    #[test]
+    fn is_tty_does_not_panic_for_stderr() {
+        let _ = is_tty(Stream::Stderr);
+    }
+
+    #[test]
+    fn format_parse_all_variants() {
+        assert_eq!(Format::parse("json"), Some(Format::Json));
+        assert_eq!(Format::parse("table"), Some(Format::Table));
+        assert_eq!(Format::parse("markdown"), Some(Format::Markdown));
+        assert_eq!(Format::parse("xml"), None);
+        assert_eq!(Format::parse(""), None);
+    }
+
+    #[test]
+    fn format_as_str_round_trips() {
+        assert_eq!(Format::Json.as_str(), "json");
+        assert_eq!(Format::Table.as_str(), "table");
+        assert_eq!(Format::Markdown.as_str(), "markdown");
+    }
+
+    #[test]
+    fn format_display_matches_as_str() {
+        for f in [Format::Json, Format::Table, Format::Markdown] {
+            assert_eq!(format!("{f}"), f.as_str());
+        }
+    }
+
+    #[test]
     fn explicit_wins() {
         assert_eq!(
             resolve_format(Some(Format::Markdown), Some("table"), true),

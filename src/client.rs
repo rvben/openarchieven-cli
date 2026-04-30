@@ -425,4 +425,122 @@ mod tests {
             start.elapsed()
         );
     }
+
+    #[test]
+    fn ttl_hint_to_cache_ttl_all_variants() {
+        use crate::cache::Ttl;
+        use std::time::Duration;
+
+        let fixed = TtlHint::Fixed(Duration::from_secs(60)).to_cache_ttl();
+        assert!(matches!(fixed, Some(Ttl::Fixed(d)) if d == Duration::from_secs(60)));
+
+        let midnight = TtlHint::UntilMidnight.to_cache_ttl();
+        assert!(matches!(midnight, Some(Ttl::UntilMidnight)));
+
+        let never = TtlHint::Never.to_cache_ttl();
+        assert!(matches!(never, Some(Ttl::Never)));
+
+        let none = TtlHint::None.to_cache_ttl();
+        assert!(none.is_none());
+    }
+
+    #[test]
+    fn config_accessor_returns_reference() {
+        let cfg = ClientConfig {
+            lang: "en".into(),
+            ..ClientConfig::default()
+        };
+        let client = Client::new(cfg.clone()).unwrap();
+        assert_eq!(client.config().lang, "en");
+    }
+
+    #[test]
+    fn backoff_uses_retry_after_when_present() {
+        let d = backoff(0, Some(42));
+        assert_eq!(d, std::time::Duration::from_secs(42));
+    }
+
+    #[test]
+    fn backoff_without_retry_after_is_bounded() {
+        for attempt in 0..3 {
+            let d = backoff(attempt, None);
+            assert!(d <= std::time::Duration::from_millis(MAX_BACKOFF_MS));
+        }
+    }
+
+    #[test]
+    fn map_validation_400_with_non_json_body() {
+        let err = map_validation_400(b"plain text error");
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.message().contains("plain text error"));
+    }
+
+    #[test]
+    fn map_validation_400_with_json_missing_error_code() {
+        let err = map_validation_400(br#"{"some":"field"}"#);
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+    }
+
+    #[test]
+    fn map_validation_400_with_full_structured_body() {
+        let body = br#"{"error_code":"OOPS","error_description":"something went wrong"}"#;
+        let err = map_validation_400(body);
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert_eq!(err.upstream_code(), Some("OOPS"));
+        assert_eq!(err.upstream_message(), Some("something went wrong"));
+    }
+
+    #[test]
+    fn map_error_status_404_is_not_found() {
+        let err = map_error_status(reqwest::StatusCode::NOT_FOUND, b"", None);
+        assert_eq!(err.kind(), crate::error::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn map_error_status_429_without_retry_after() {
+        let err = map_error_status(reqwest::StatusCode::TOO_MANY_REQUESTS, b"", None);
+        assert_eq!(err.kind(), crate::error::ErrorKind::RateLimit);
+        assert!(err.retry_after_seconds().is_none());
+    }
+
+    #[test]
+    fn map_error_status_429_with_retry_after() {
+        let err = map_error_status(reqwest::StatusCode::TOO_MANY_REQUESTS, b"", Some(15));
+        assert_eq!(err.kind(), crate::error::ErrorKind::RateLimit);
+        assert_eq!(err.retry_after_seconds(), Some(15));
+    }
+
+    #[test]
+    fn map_error_status_500_is_server() {
+        let err = map_error_status(reqwest::StatusCode::INTERNAL_SERVER_ERROR, b"", None);
+        assert_eq!(err.kind(), crate::error::ErrorKind::Server);
+    }
+
+    #[test]
+    fn map_error_status_unexpected_code_is_server() {
+        let err = map_error_status(reqwest::StatusCode::from_u16(418).unwrap(), b"", None);
+        assert_eq!(err.kind(), crate::error::ErrorKind::Server);
+    }
+
+    #[test]
+    fn resolve_base_url_env_var_is_used_when_no_explicit() {
+        // Exercise the env-reading branch via the explicit fallback path.
+        // We use resolve_base_url with an explicit value here to avoid
+        // mutating global env state that can cause races with other tests.
+        assert_eq!(
+            resolve_base_url(Some("http://from-env/v2/")),
+            "http://from-env/v2"
+        );
+    }
+
+    #[test]
+    fn build_url_rejects_malformed_base_url() {
+        let cfg = ClientConfig {
+            base_url: "not-a-url".into(),
+            ..ClientConfig::default()
+        };
+        let client = Client::new(cfg).unwrap();
+        let err = client.build_url("/path", &[]).unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+    }
 }

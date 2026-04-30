@@ -6,6 +6,19 @@ use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+fn refused_client() -> Client {
+    // Port 1 is generally reserved and will produce a connection refused error
+    // quickly without any OS-level delay.
+    Client::new(ClientConfig {
+        base_url: "http://127.0.0.1:1".to_string(),
+        timeout: Duration::from_secs(2),
+        lang: "nl".into(),
+        rate_limit_per_sec: 1000,
+        ..ClientConfig::default()
+    })
+    .unwrap()
+}
+
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -124,4 +137,58 @@ fn execute_once_2xx_unparseable_is_parse() {
     let c = client(&server.uri());
     let err = c.execute_once("/records/search", &[]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::Parse);
+}
+
+#[test]
+fn execute_once_connection_refused_is_network_error() {
+    let c = refused_client();
+    let err = c.execute_once("/any", &[]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Network);
+}
+
+#[test]
+fn execute_once_400_with_non_json_body_is_validation() {
+    let (rt, server) = start_server();
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/search"))
+            .respond_with(ResponseTemplate::new(400).set_body_string("plain error text"))
+            .mount(&server)
+            .await;
+    });
+    let c = client(&server.uri());
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.upstream_code().is_none());
+}
+
+#[test]
+fn execute_once_400_with_json_but_no_error_code_is_validation() {
+    let (rt, server) = start_server();
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/search"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(json!({"message": "bad input"})))
+            .mount(&server)
+            .await;
+    });
+    let c = client(&server.uri());
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.upstream_code().is_none());
+}
+
+#[test]
+fn execute_once_unexpected_status_is_server() {
+    let (rt, server) = start_server();
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/search"))
+            .respond_with(ResponseTemplate::new(418))
+            .mount(&server)
+            .await;
+    });
+    let c = client(&server.uri());
+    let err = c.execute_once("/records/search", &[]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Server);
 }

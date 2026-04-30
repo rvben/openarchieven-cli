@@ -226,4 +226,46 @@ mod tests {
         assert_eq!(v["error"]["retryable"], true);
         assert_eq!(v["error"]["retry_after_seconds"], 30);
     }
+
+    #[test]
+    fn error_kind_display_uses_as_str() {
+        assert_eq!(format!("{}", ErrorKind::Validation), "validation");
+        assert_eq!(format!("{}", ErrorKind::NotFound), "not_found");
+        assert_eq!(format!("{}", ErrorKind::RateLimit), "rate_limit");
+        assert_eq!(format!("{}", ErrorKind::Timeout), "timeout");
+        assert_eq!(format!("{}", ErrorKind::Network), "network");
+        assert_eq!(format!("{}", ErrorKind::Server), "server");
+        assert_eq!(format!("{}", ErrorKind::Parse), "parse");
+        assert_eq!(format!("{}", ErrorKind::Conflict), "conflict");
+    }
+
+    #[test]
+    fn error_display_includes_kind_and_message() {
+        let err = Error::new(ErrorKind::NotFound, "missing record");
+        let s = format!("{err}");
+        assert!(s.contains("not_found"), "display: {s}");
+        assert!(s.contains("missing record"), "display: {s}");
+    }
+
+    #[test]
+    fn error_accessors_return_correct_values() {
+        let err = Error::new(ErrorKind::Server, "boom")
+            .with_upstream("ERR_CODE", "upstream msg")
+            .with_retry_after(60);
+        assert_eq!(err.kind(), ErrorKind::Server);
+        assert_eq!(err.message(), "boom");
+        assert_eq!(err.upstream_code(), Some("ERR_CODE"));
+        assert_eq!(err.upstream_message(), Some("upstream msg"));
+        assert_eq!(err.retry_after_seconds(), Some(60));
+        assert!(err.is_retryable_transport());
+    }
+
+    #[test]
+    fn error_accessors_none_when_not_set() {
+        let err = Error::new(ErrorKind::Validation, "bad input");
+        assert!(err.upstream_code().is_none());
+        assert!(err.upstream_message().is_none());
+        assert!(err.retry_after_seconds().is_none());
+        assert!(!err.is_retryable_transport());
+    }
 }

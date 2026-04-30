@@ -165,6 +165,7 @@ pub fn resolve_ttl(ctx: &ApiContext, default: TtlHint) -> TtlHint {
 mod tests {
     use super::*;
     use crate::cli::ApiArgs;
+    use std::time::Duration;
 
     fn args() -> ApiArgs {
         ApiArgs {
@@ -252,5 +253,236 @@ mod tests {
             let parsed: Option<u32> = bad.parse::<u32>().ok().filter(|&n| n > 0);
             assert_eq!(parsed, None, "{bad}");
         }
+    }
+
+    #[test]
+    fn cache_ttl_humantime_duration_sets_fixed_ttl() {
+        let mut a = args();
+        a.cache_ttl = Some("1h".into());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        assert!(
+            matches!(ctx.cache_ttl_override, Some(TtlOverride::Fixed(d)) if d == Duration::from_secs(3600))
+        );
+        assert!(matches!(ctx.cache_mode, CacheMode::Default));
+    }
+
+    #[test]
+    fn no_cache_flag_sets_bypass_mode() {
+        let mut a = args();
+        a.no_cache = true;
+        let ctx = ApiContext::from_args(&a).unwrap();
+        assert!(matches!(ctx.cache_mode, CacheMode::Bypass));
+    }
+
+    #[test]
+    fn timeout_arg_is_respected() {
+        let mut a = args();
+        a.timeout = Some(Duration::from_secs(10));
+        let ctx = ApiContext::from_args(&a).unwrap();
+        assert_eq!(ctx.timeout, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn empty_fields_string_produces_empty_vec() {
+        let mut a = args();
+        a.fields = Some("".into());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        assert!(ctx.fields.as_ref().unwrap().is_empty());
+    }
+
+    #[test]
+    fn lang_arg_overrides_default() {
+        let mut a = args();
+        a.lang = Some("en".into());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        assert_eq!(ctx.lang, "en");
+    }
+
+    #[test]
+    fn limit_and_offset_are_passed_through() {
+        let mut a = args();
+        a.limit = Some(20);
+        a.offset = Some(5);
+        let ctx = ApiContext::from_args(&a).unwrap();
+        assert_eq!(ctx.limit, Some(20));
+        assert_eq!(ctx.offset, Some(5));
+    }
+
+    #[test]
+    fn resolve_ttl_disabled_override_returns_none() {
+        let mut a = args();
+        a.cache_ttl = Some("0".into());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        let hint = resolve_ttl(&ctx, TtlHint::Fixed(Duration::from_secs(60)));
+        assert!(matches!(hint, TtlHint::None));
+    }
+
+    #[test]
+    fn resolve_ttl_forever_override_returns_never() {
+        let mut a = args();
+        a.cache_ttl = Some("inf".into());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        let hint = resolve_ttl(&ctx, TtlHint::Fixed(Duration::from_secs(60)));
+        assert!(matches!(hint, TtlHint::Never));
+    }
+
+    #[test]
+    fn resolve_ttl_fixed_override_replaces_default() {
+        let mut a = args();
+        a.cache_ttl = Some("30m".into());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        let hint = resolve_ttl(&ctx, TtlHint::UntilMidnight);
+        assert!(matches!(hint, TtlHint::Fixed(d) if d == Duration::from_secs(1800)));
+    }
+
+    #[test]
+    fn resolve_ttl_no_override_returns_default() {
+        let ctx = ApiContext::from_args(&args()).unwrap();
+        let hint = resolve_ttl(&ctx, TtlHint::UntilMidnight);
+        assert!(matches!(hint, TtlHint::UntilMidnight));
+    }
+
+    #[test]
+    fn cache_ttl_zero_duration_via_humantime_means_bypass() {
+        // humantime can parse "0s" as a zero Duration, which should map to Bypass.
+        let mut a = args();
+        a.cache_ttl = Some("0s".into());
+        // humantime returns Ok(Duration::ZERO) for "0s" in recent versions.
+        // If it fails to parse, that's also acceptable — just check it doesn't panic.
+        match ApiContext::from_args(&a) {
+            Ok(ctx) => assert!(matches!(ctx.cache_mode, CacheMode::Bypass)),
+            Err(e) => assert_eq!(e.kind(), ErrorKind::Validation),
+        }
+    }
+
+    #[test]
+    fn global_args_no_output_flag_uses_tty_detection() {
+        use crate::cli::{Cli, Cmd};
+        let cli = Cli {
+            output: None,
+            quiet: false,
+            no_color: false,
+            command: Cmd::Version,
+        };
+        let ga = GlobalArgs::from_cli(&cli);
+        // The exact format depends on TTY state; just check it doesn't panic.
+        let _ = ga.format;
+    }
+
+    #[test]
+    fn global_args_explicit_json_output_flag() {
+        use crate::cli::{Cli, Cmd, FormatArg};
+        let cli = Cli {
+            output: Some(FormatArg::Json),
+            quiet: false,
+            no_color: false,
+            command: Cmd::Version,
+        };
+        let ga = GlobalArgs::from_cli(&cli);
+        assert_eq!(ga.format, crate::tty::Format::Json);
+    }
+
+    #[test]
+    fn global_args_explicit_table_output_flag() {
+        use crate::cli::{Cli, Cmd, FormatArg};
+        let cli = Cli {
+            output: Some(FormatArg::Table),
+            quiet: true,
+            no_color: true,
+            command: Cmd::Version,
+        };
+        let ga = GlobalArgs::from_cli(&cli);
+        assert_eq!(ga.format, crate::tty::Format::Table);
+        assert!(ga.quiet);
+        assert!(ga.no_color);
+    }
+
+    #[test]
+    fn global_args_explicit_markdown_output_flag() {
+        use crate::cli::{Cli, Cmd, FormatArg};
+        let cli = Cli {
+            output: Some(FormatArg::Markdown),
+            quiet: false,
+            no_color: false,
+            command: Cmd::Version,
+        };
+        let ga = GlobalArgs::from_cli(&cli);
+        assert_eq!(ga.format, crate::tty::Format::Markdown);
+    }
+
+    #[test]
+    fn build_client_returns_ok_with_valid_context() {
+        let ctx = ApiContext::from_args(&args()).unwrap();
+        assert!(build_client(&ctx).is_ok());
+    }
+
+    #[test]
+    fn build_cache_returns_none_when_bypass() {
+        let mut a = args();
+        a.no_cache = true;
+        let ctx = ApiContext::from_args(&a).unwrap();
+        let result = build_cache(&ctx).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn build_cache_with_explicit_dir_returns_some() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut a = args();
+        a.cache_dir = Some(dir.path().to_path_buf());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        let result = build_cache(&ctx).unwrap();
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn cache_disabled_via_env_returns_true_when_set_to_1() {
+        unsafe { std::env::set_var("OPENARCHIEVEN_CACHE_DISABLE", "1") };
+        let result = cache_disabled_via_env();
+        unsafe { std::env::remove_var("OPENARCHIEVEN_CACHE_DISABLE") };
+        assert!(result);
+    }
+
+    #[test]
+    fn cache_disabled_via_env_returns_false_for_other_values() {
+        unsafe { std::env::set_var("OPENARCHIEVEN_CACHE_DISABLE", "0") };
+        let result = cache_disabled_via_env();
+        unsafe { std::env::remove_var("OPENARCHIEVEN_CACHE_DISABLE") };
+        assert!(!result);
+    }
+
+    #[test]
+    fn build_cache_returns_none_when_env_disable_is_1() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut a = args();
+        a.cache_dir = Some(dir.path().to_path_buf());
+        let ctx = ApiContext::from_args(&a).unwrap();
+        unsafe { std::env::set_var("OPENARCHIEVEN_CACHE_DISABLE", "1") };
+        let result = build_cache(&ctx).unwrap();
+        unsafe { std::env::remove_var("OPENARCHIEVEN_CACHE_DISABLE") };
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn rate_limit_from_env_returns_some_for_valid_positive() {
+        unsafe { std::env::set_var("OPENARCHIEVEN_RATE_LIMIT", "10") };
+        let result = rate_limit_from_env();
+        unsafe { std::env::remove_var("OPENARCHIEVEN_RATE_LIMIT") };
+        assert_eq!(result, Some(10));
+    }
+
+    #[test]
+    fn rate_limit_from_env_returns_none_for_zero() {
+        unsafe { std::env::set_var("OPENARCHIEVEN_RATE_LIMIT", "0") };
+        let result = rate_limit_from_env();
+        unsafe { std::env::remove_var("OPENARCHIEVEN_RATE_LIMIT") };
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn default_cache_dir_returns_some_on_this_platform() {
+        // ProjectDirs should resolve on macOS/Linux in the test environment.
+        let result = default_cache_dir();
+        assert!(result.is_some());
     }
 }
