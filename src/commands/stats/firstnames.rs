@@ -60,7 +60,7 @@ pub fn run(
     let limit_s = limit.to_string();
     let params: Vec<(&str, &str)> = vec![
         ("place", args.place.as_str()),
-        ("year", yr.as_str()),
+        ("eventyear", yr.as_str()),
         ("number_show", limit_s.as_str()),
     ];
 
