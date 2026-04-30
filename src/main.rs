@@ -190,10 +190,16 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::marriages::run(client, cache, ctx, &typed)
             })
         }
-        Cmd::Yearsago(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::yearsago::parse_rest(rest)?;
-            openarchieven::commands::yearsago::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::Yearsago(args) => {
+            let openarchieven::cli::YearsagoArgs {
+                global: global_api,
+                years,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::yearsago::Args { years };
+                openarchieven::commands::yearsago::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Census(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
             let parsed = openarchieven::commands::census::parse_rest(rest)?;
             openarchieven::commands::census::run(client, cache, ctx, &parsed)

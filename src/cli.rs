@@ -52,7 +52,7 @@ pub enum Cmd {
     /// Marriage-event records.
     Marriages(MarriagesArgs),
     /// Anniversary records.
-    Yearsago(ApiArgs),
+    Yearsago(YearsagoArgs),
     /// List archives.
     Archives(ApiArgs),
     /// Census records by place/year.
@@ -145,6 +145,21 @@ pub struct GlobalApiArgs {
     /// Response language.
     #[arg(long)]
     pub lang: Option<String>,
+}
+
+const YEARSAGO_EXAMPLES: &str = "\
+Examples:
+  openarchieven yearsago 100      # records from 100 years ago today
+  openarchieven yearsago 50 --limit 20
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = YEARSAGO_EXAMPLES)]
+pub struct YearsagoArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Number of years ago.
+    pub years: u32,
 }
 
 const MATCH_EXAMPLES: &str = "\

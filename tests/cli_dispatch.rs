@@ -1035,3 +1035,22 @@ fn match_help_shows_real_args_and_examples() {
     assert!(s.contains("Examples:"), "help: {s}");
     assert!(s.contains("Pieter Jansen"), "help: {s}");
 }
+
+#[test]
+fn yearsago_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["yearsago", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("<YEARS>"), "help: {s}");
+    assert!(s.contains("Examples:"), "help: {s}");
+    assert!(s.contains("100 years ago"), "help: {s}");
+}

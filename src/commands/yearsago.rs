@@ -71,38 +71,6 @@ pub fn run(
     )
 }
 
-pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let mut positional: Vec<String> = Vec::new();
-    for tok in rest {
-        if tok.starts_with("--") {
-            return Err(Error::new(
-                ErrorKind::Validation,
-                format!("unknown flag {tok} for `yearsago`; no per-command flags supported"),
-            ));
-        }
-        positional.push(tok.clone());
-    }
-    if positional.len() != 1 {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!(
-                "yearsago: expected 1 positional arg (<years>), got {}",
-                positional.len()
-            ),
-        ));
-    }
-    let years: u32 = positional[0].parse().map_err(|_| {
-        Error::new(
-            ErrorKind::Validation,
-            format!(
-                "yearsago: years must be a non-negative integer, got {:?}",
-                positional[0]
-            ),
-        )
-    })?;
-    Ok(Args { years })
-}
-
 pub fn schema() -> Command {
     Command {
         name: "yearsago",
@@ -148,53 +116,5 @@ pub fn schema() -> Command {
                 ty: "boolean",
             },
         ],
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn strs(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn parse_rest_one_positional_ok() {
-        let a = parse_rest(&strs(&["100"])).unwrap();
-        assert_eq!(a.years, 100);
-    }
-
-    #[test]
-    fn parse_rest_zero_positionals_is_validation_error() {
-        let err = parse_rest(&[]).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("expected 1"));
-    }
-
-    #[test]
-    fn parse_rest_two_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&["100", "200"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-    }
-
-    #[test]
-    fn parse_rest_non_integer_years_is_validation_error() {
-        let err = parse_rest(&strs(&["abc"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("years"));
-    }
-
-    #[test]
-    fn parse_rest_negative_years_is_validation_error() {
-        let err = parse_rest(&strs(&["-5"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-    }
-
-    #[test]
-    fn parse_rest_unknown_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["--zzz", "100"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--zzz"));
     }
 }
