@@ -979,3 +979,39 @@ fn marriages_help_shows_real_args_and_examples() {
     assert!(s.contains("Pieter Jansen"), "help: {s}");
     assert!(s.contains("Anna de Vries"), "help: {s}");
 }
+
+#[test]
+fn search_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["search", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("<NAME>"), "help: {s}");
+    assert!(s.contains("--archive"), "help: {s}");
+    assert!(s.contains("--sort"), "help: {s}");
+    assert!(s.contains("--event-place"), "help: {s}");
+    assert!(s.contains("--source-type"), "help: {s}");
+    assert!(s.contains("Examples:"), "help: {s}");
+    assert!(s.contains("Pieter Jansen"), "help: {s}");
+}
+
+#[test]
+fn search_rejects_sort_zero_at_argument_parse() {
+    let dir = tempfile::tempdir().unwrap();
+    let assert = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .args(["search", "jansen", "--sort=0"])
+        .assert()
+        .failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(stderr.contains("--sort"), "stderr: {stderr}");
+}

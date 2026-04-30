@@ -39,7 +39,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Cmd {
     /// Free-text record search.
-    Search(ApiArgs),
+    Search(SearchArgs),
     /// Show a single record by archive + identifier.
     Show(ApiArgs),
     /// Score-matched record lookup.
@@ -145,6 +145,52 @@ pub struct GlobalApiArgs {
     /// Response language.
     #[arg(long)]
     pub lang: Option<String>,
+}
+
+const SEARCH_EXAMPLES: &str = "\
+Examples:
+  openarchieven search \"Pieter Jansen\"
+  openarchieven search \"Jansen\" --event-place Rotterdam --limit 50
+  openarchieven search \"Anna\" --archive elo --source-type \"BS Geboorte\"
+  openarchieven -o json search \"Jansen\" | jq '.items[0]'
+";
+
+fn parse_sort_arg(s: &str) -> Result<i32, String> {
+    let n: i32 = s.parse().map_err(|_| format!("not an integer: {s}"))?;
+    if n == 0 || !(-6..=6).contains(&n) {
+        return Err(format!("must be in -6..=-1 or 1..=6, got {n}"));
+    }
+    Ok(n)
+}
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = SEARCH_EXAMPLES)]
+pub struct SearchArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Free-text query (typically a person name).
+    pub name: String,
+    /// Filter by archive code.
+    #[arg(long)]
+    pub archive: Option<String>,
+    /// Filter by source type (e.g. `BS Geboorte`).
+    #[arg(long)]
+    pub source_type: Option<String>,
+    /// Filter by event place.
+    #[arg(long)]
+    pub event_place: Option<String>,
+    /// Filter by birth place.
+    #[arg(long)]
+    pub birth_place: Option<String>,
+    /// Filter by relation type (e.g. `vader`, `moeder`).
+    #[arg(long)]
+    pub relation_type: Option<String>,
+    /// Filter by country.
+    #[arg(long)]
+    pub country: Option<String>,
+    /// Sort order: -6..=-1 or 1..=6 (see `openarchieven schema` for meanings).
+    #[arg(long, allow_hyphen_values = true, value_parser = parse_sort_arg)]
+    pub sort: Option<i32>,
 }
 
 const BIRTHS_EXAMPLES: &str = "\
