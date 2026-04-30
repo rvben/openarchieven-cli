@@ -67,7 +67,7 @@ pub fn run(
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
     let body = client.get_cached("/stats/firstnames.json", &params, ttl, cache)?;
     let items = body
-        .pointer("/firstnames")
+        .pointer("/response/firstnames")
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
