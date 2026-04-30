@@ -154,3 +154,98 @@ fn search_caps_limit_at_100() {
         err.message()
     );
 }
+
+#[test]
+fn search_rejects_zero_limit() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let mut ctx = ctx();
+    ctx.limit = Some(0);
+
+    let args = search::Args {
+        name: "jansen".into(),
+        ..Default::default()
+    };
+
+    let err = search::run(&client, Some(&cache), &ctx, &args).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(
+        err.message().contains("at least 1"),
+        "msg: {}",
+        err.message()
+    );
+}
+
+#[test]
+fn search_sends_optional_filters() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/search.json"))
+            .and(query_param("name", "jansen"))
+            .and(query_param("archive_code", "elo"))
+            .and(query_param("source_type", "BS"))
+            .and(query_param("event_place", "Amsterdam"))
+            .and(query_param("birth_place", "Leiden"))
+            .and(query_param("relation_type", "vader"))
+            .and(query_param("country", "NL"))
+            .and(query_param("sort", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "response": {"numFound": 1, "docs": [{"id": "x"}]}
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let args = search::Args {
+        name: "jansen".into(),
+        archive: Some("elo".into()),
+        source_type: Some("BS".into()),
+        event_place: Some("Amsterdam".into()),
+        birth_place: Some("Leiden".into()),
+        relation_type: Some("vader".into()),
+        country: Some("NL".into()),
+        sort: Some(2),
+    };
+
+    let r = search::run(&client, Some(&cache), &ctx(), &args).unwrap();
+    let envelope = r.list_envelope(r.total);
+    assert_eq!(envelope["total"], 1);
+}
+
+#[test]
+fn search_handles_missing_response_docs() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/search.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let args = search::Args {
+        name: "jansen".into(),
+        ..Default::default()
+    };
+
+    let r = search::run(&client, Some(&cache), &ctx(), &args).unwrap();
+    assert!(r.total.is_none());
+    let envelope = r.list_envelope(r.total);
+    assert_eq!(envelope["items"].as_array().unwrap().len(), 0);
+}

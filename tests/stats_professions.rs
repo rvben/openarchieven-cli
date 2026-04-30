@@ -142,3 +142,94 @@ fn professions_rejects_limit_over_100() {
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--limit"));
 }
+
+#[test]
+fn professions_rejects_zero_limit() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let mut c = ctx();
+    c.limit = Some(0);
+
+    let err =
+        professions::run(&client, Some(&cache), &c, &professions::Args::default()).unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--limit"), "msg: {}", err.message());
+}
+
+#[test]
+fn professions_rejects_offset() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let mut c = ctx();
+    c.offset = Some(10);
+
+    let err =
+        professions::run(&client, Some(&cache), &c, &professions::Args::default()).unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--offset"), "msg: {}", err.message());
+}
+
+#[test]
+fn professions_rejects_year_end_out_of_range() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let err = professions::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &professions::Args {
+            year_end: Some(1961),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--year-end"));
+}
+
+#[test]
+fn professions_rejects_year_start_after_year_end() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let err = professions::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &professions::Args {
+            year_start: Some(1800),
+            year_end: Some(1700),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(
+        err.message().contains("--year-start"),
+        "msg: {}",
+        err.message()
+    );
+}

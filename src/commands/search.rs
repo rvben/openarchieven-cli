@@ -550,4 +550,127 @@ mod tests {
         assert_eq!(a.country.as_deref(), Some("NL"));
         assert_eq!(a.sort, Some(2));
     }
+
+    #[test]
+    fn source_type_space_form() {
+        let a = parse_rest(&strs(&["jansen", "--source-type", "BS"])).unwrap();
+        assert_eq!(a.source_type.as_deref(), Some("BS"));
+    }
+
+    #[test]
+    fn source_type_eq_empty_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--source-type="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--source-type"),
+            "msg: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn event_place_space_form() {
+        let a = parse_rest(&strs(&["jansen", "--event-place", "Amsterdam"])).unwrap();
+        assert_eq!(a.event_place.as_deref(), Some("Amsterdam"));
+    }
+
+    #[test]
+    fn event_place_eq_empty_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--event-place="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn birth_place_space_form() {
+        let a = parse_rest(&strs(&["jansen", "--birth-place", "Leiden"])).unwrap();
+        assert_eq!(a.birth_place.as_deref(), Some("Leiden"));
+    }
+
+    #[test]
+    fn birth_place_eq_empty_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--birth-place="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn relation_type_space_form() {
+        let a = parse_rest(&strs(&["jansen", "--relation-type", "vader"])).unwrap();
+        assert_eq!(a.relation_type.as_deref(), Some("vader"));
+    }
+
+    #[test]
+    fn relation_type_eq_empty_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--relation-type="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn country_space_form() {
+        let a = parse_rest(&strs(&["jansen", "--country", "NL"])).unwrap();
+        assert_eq!(a.country.as_deref(), Some("NL"));
+    }
+
+    #[test]
+    fn country_eq_empty_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--country="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn sort_at_end_of_input_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--sort"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--sort"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn sort_followed_by_flag_is_validation_error() {
+        let err = parse_rest(&strs(&["jansen", "--sort", "--archive"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn sort_extreme_valid_values_accepted() {
+        let a = parse_rest(&strs(&["jansen", "--sort", "-6"])).unwrap();
+        assert_eq!(a.sort, Some(-6));
+        let a = parse_rest(&strs(&["jansen", "--sort", "6"])).unwrap();
+        assert_eq!(a.sort, Some(6));
+    }
+
+    #[test]
+    fn schema_returns_correct_command_name() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "search");
+        assert!(cmd.paginated);
+        assert_eq!(cmd.response_shape, "list");
+        let sort_arg = cmd.args.iter().find(|a| a.name == "--sort").unwrap();
+        assert!(sort_arg.r#enum.is_some());
+        assert_eq!(sort_arg.r#enum.as_ref().unwrap().len(), 12);
+        let name_arg = cmd.args.iter().find(|a| a.name == "name").unwrap();
+        assert!(name_arg.required);
+        assert!(name_arg.positional);
+        let limit_arg = cmd.args.iter().find(|a| a.name == "--limit").unwrap();
+        assert_eq!(limit_arg.max, Some(100));
+        let lang_arg = cmd.args.iter().find(|a| a.name == "--lang").unwrap();
+        assert!(lang_arg.r#enum.is_some());
+        let archive_arg = cmd.args.iter().find(|a| a.name == "--archive").unwrap();
+        assert!(!archive_arg.required);
+        let source_type = cmd.args.iter().find(|a| a.name == "--source-type").unwrap();
+        assert!(!source_type.required);
+        let event_place = cmd.args.iter().find(|a| a.name == "--event-place").unwrap();
+        assert!(!event_place.required);
+        let birth_place = cmd.args.iter().find(|a| a.name == "--birth-place").unwrap();
+        assert!(!birth_place.required);
+        let relation_type = cmd
+            .args
+            .iter()
+            .find(|a| a.name == "--relation-type")
+            .unwrap();
+        assert!(!relation_type.required);
+        let country = cmd.args.iter().find(|a| a.name == "--country").unwrap();
+        assert!(!country.required);
+        assert_eq!(cmd.output_fields.len(), 5);
+        assert!(cmd.output_fields.iter().any(|f| f.name == "items"));
+        assert!(cmd.output_fields.iter().any(|f| f.name == "total"));
+    }
 }

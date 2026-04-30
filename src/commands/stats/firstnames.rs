@@ -266,4 +266,49 @@ mod tests {
         assert_eq!(err.kind(), ErrorKind::Validation);
         assert!(err.message().contains("--year"));
     }
+
+    #[test]
+    fn parse_rest_unexpected_positional_is_validation_error() {
+        let err = parse_rest(&strs(&["extra"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("extra"));
+    }
+
+    #[test]
+    fn parse_rest_empty_place_is_validation_error() {
+        let err = parse_rest(&strs(&["--place=", "--year=1850"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--place"));
+    }
+
+    #[test]
+    fn parse_rest_empty_year_is_validation_error() {
+        let err = parse_rest(&strs(&["--place=Leiden", "--year="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--year"));
+    }
+
+    #[test]
+    fn parse_rest_flag_at_end_is_validation_error() {
+        let err = parse_rest(&strs(&["--place"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--place"));
+    }
+
+    #[test]
+    fn parse_rest_flag_followed_by_flag_is_validation_error() {
+        let err = parse_rest(&strs(&["--place", "--year"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn schema_returns_correct_command_name() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "stats firstnames");
+        let place = cmd.args.iter().find(|a| a.name == "--place").unwrap();
+        assert!(place.required);
+        let year = cmd.args.iter().find(|a| a.name == "--year").unwrap();
+        assert_eq!(year.min, Some(MIN_YEAR as i64));
+        assert_eq!(year.max, Some(MAX_YEAR as i64));
+    }
 }

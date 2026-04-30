@@ -186,4 +186,40 @@ mod tests {
         let err = parse_rest(&strs(&["--zzz", "jansen", "1850"])).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Validation);
     }
+
+    #[test]
+    fn parse_rest_three_positionals_is_validation_error() {
+        let err = parse_rest(&strs(&["a", "1850", "extra"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("match"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn parse_rest_zero_positionals_is_validation_error() {
+        let err = parse_rest(&strs(&[])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("match"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn schema_returns_correct_shape() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "match");
+        assert!(!cmd.paginated);
+        assert_eq!(cmd.response_shape, "list");
+        let name_arg = cmd.args.iter().find(|a| a.name == "name").unwrap();
+        assert!(name_arg.required);
+        assert!(name_arg.positional);
+        let birthyear = cmd.args.iter().find(|a| a.name == "birthyear").unwrap();
+        assert!(birthyear.required);
+        assert!(birthyear.positional);
+        let lang = cmd.args.iter().find(|a| a.name == "--lang").unwrap();
+        assert!(!lang.required);
+        assert!(lang.r#enum.is_some());
+        assert_eq!(lang.r#enum.as_ref().unwrap().len(), 2);
+        assert_eq!(cmd.output_fields.len(), 3);
+        assert!(cmd.output_fields.iter().any(|f| f.name == "items"));
+        assert!(cmd.output_fields.iter().any(|f| f.name == "total"));
+        assert!(cmd.output_fields.iter().any(|f| f.name == "paginated"));
+    }
 }

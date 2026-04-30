@@ -291,4 +291,89 @@ mod tests {
         assert!(validate_iso_date("18500-06-15").is_err());
         assert!(validate_iso_date("1850-6-15").is_err());
     }
+
+    #[test]
+    fn parse_rest_missing_latitude_is_validation_error() {
+        let err = parse_rest(&strs(&["--date=1850-06-15", "--longitude=4.49"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(
+            err.message().contains("--latitude"),
+            "msg: {}",
+            err.message()
+        );
+    }
+
+    #[test]
+    fn parse_rest_empty_date_is_validation_error() {
+        let err =
+            parse_rest(&strs(&["--date=", "--longitude=4.49", "--latitude=52.16"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--date"));
+    }
+
+    #[test]
+    fn parse_rest_empty_longitude_is_validation_error() {
+        let err = parse_rest(&strs(&[
+            "--date=1850-06-15",
+            "--longitude=",
+            "--latitude=52.16",
+        ]))
+        .unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--longitude"));
+    }
+
+    #[test]
+    fn parse_rest_empty_latitude_is_validation_error() {
+        let err = parse_rest(&strs(&[
+            "--date=1850-06-15",
+            "--longitude=4.49",
+            "--latitude=",
+        ]))
+        .unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--latitude"));
+    }
+
+    #[test]
+    fn parse_rest_flag_at_end_is_validation_error() {
+        let err = parse_rest(&strs(&["--date"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--date"));
+    }
+
+    #[test]
+    fn parse_rest_flag_followed_by_flag_is_validation_error() {
+        let err = parse_rest(&strs(&["--date", "--longitude"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn validate_decimal_accepts_valid() {
+        assert!(validate_decimal("4.49", "--longitude").is_ok());
+        assert!(validate_decimal("-52.16", "--latitude").is_ok());
+        assert!(validate_decimal("0", "--longitude").is_ok());
+    }
+
+    #[test]
+    fn validate_decimal_rejects_non_numeric() {
+        let err = validate_decimal("not-a-number", "--longitude").unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--longitude"));
+    }
+
+    #[test]
+    fn validate_iso_date_rejects_non_digit_parts() {
+        assert!(validate_iso_date("18ab-06-15").is_err());
+        assert!(validate_iso_date("1850-0x-15").is_err());
+    }
+
+    #[test]
+    fn schema_returns_correct_command_name() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "weather");
+        assert_eq!(cmd.response_shape, "single-nested");
+        let date_arg = cmd.args.iter().find(|a| a.name == "--date").unwrap();
+        assert!(date_arg.required);
+    }
 }

@@ -186,3 +186,113 @@ fn next_value(
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strs(args: &[&str]) -> Vec<String> {
+        args.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn parse_common_event_year_eq_form() {
+        let (pos, flags) =
+            parse_common_flags(&strs(&["jansen", "--event-year=1900"]), true, "births").unwrap();
+        assert_eq!(pos, vec!["jansen"]);
+        assert_eq!(flags.event_year, Some(1900));
+    }
+
+    #[test]
+    fn parse_common_event_year_space_form() {
+        let (_, flags) =
+            parse_common_flags(&strs(&["jansen", "--event-year", "1800"]), true, "births").unwrap();
+        assert_eq!(flags.event_year, Some(1800));
+    }
+
+    #[test]
+    fn parse_common_event_place_space_form() {
+        let (_, flags) = parse_common_flags(
+            &strs(&["jansen", "--event-place", "Amsterdam"]),
+            true,
+            "births",
+        )
+        .unwrap();
+        assert_eq!(flags.event_place.as_deref(), Some("Amsterdam"));
+    }
+
+    #[test]
+    fn parse_common_event_province_eq_form_allowed() {
+        let (_, flags) =
+            parse_common_flags(&strs(&["jansen", "--event-province=ZH"]), true, "births").unwrap();
+        assert_eq!(flags.event_province.as_deref(), Some("ZH"));
+    }
+
+    #[test]
+    fn parse_common_event_province_space_form_allowed() {
+        let (_, flags) =
+            parse_common_flags(&strs(&["jansen", "--event-province", "NH"]), true, "births")
+                .unwrap();
+        assert_eq!(flags.event_province.as_deref(), Some("NH"));
+    }
+
+    #[test]
+    fn parse_common_event_province_eq_form_disallowed_is_error() {
+        let err = parse_common_flags(&strs(&["jansen", "--event-province=ZH"]), false, "deaths")
+            .unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.message().contains("--event-province"));
+    }
+
+    #[test]
+    fn parse_common_event_province_space_form_disallowed_is_error() {
+        let err = parse_common_flags(
+            &strs(&["jansen", "--event-province", "ZH"]),
+            false,
+            "deaths",
+        )
+        .unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.message().contains("--event-province"));
+    }
+
+    #[test]
+    fn parse_common_unknown_flag_is_error() {
+        let err = parse_common_flags(&strs(&["jansen", "--unknown"]), true, "births").unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.message().contains("--unknown"));
+    }
+
+    #[test]
+    fn parse_common_event_year_not_integer_is_error() {
+        let err = parse_common_flags(&strs(&["jansen", "--event-year=notanint"]), true, "births")
+            .unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.message().contains("--event-year"));
+    }
+
+    #[test]
+    fn parse_common_flag_at_end_is_error() {
+        let err =
+            parse_common_flags(&strs(&["jansen", "--event-year"]), true, "births").unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.message().contains("--event-year"));
+    }
+
+    #[test]
+    fn parse_common_flag_followed_by_flag_is_error() {
+        let err = parse_common_flags(
+            &strs(&["jansen", "--event-year", "--event-place"]),
+            true,
+            "births",
+        )
+        .unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+    }
+
+    #[test]
+    fn parse_common_multiple_positionals_collected() {
+        let (pos, _) = parse_common_flags(&strs(&["jan", "anna"]), true, "marriages").unwrap();
+        assert_eq!(pos, vec!["jan", "anna"]);
+    }
+}

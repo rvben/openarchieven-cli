@@ -156,3 +156,81 @@ fn firstnames_rejects_offset() {
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--offset"));
 }
+
+#[test]
+fn firstnames_rejects_year_above_range() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let err = firstnames::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &firstnames::Args {
+            place: "Leiden".into(),
+            year: 1961,
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--year"));
+}
+
+#[test]
+fn firstnames_rejects_zero_limit() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let mut c = ctx();
+    c.limit = Some(0);
+
+    let err = firstnames::run(
+        &client,
+        Some(&cache),
+        &c,
+        &firstnames::Args {
+            place: "Leiden".into(),
+            year: 1850,
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--limit"));
+}
+
+#[test]
+fn firstnames_rejects_limit_over_100() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let mut c = ctx();
+    c.limit = Some(101);
+
+    let err = firstnames::run(
+        &client,
+        Some(&cache),
+        &c,
+        &firstnames::Args {
+            place: "Leiden".into(),
+            year: 1850,
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--limit"));
+}

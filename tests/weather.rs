@@ -184,3 +184,60 @@ fn weather_rejects_fields() {
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--fields"));
 }
+
+#[test]
+fn weather_rejects_offset() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let mut c = ctx();
+    c.offset = Some(5);
+
+    let err = weather::run(
+        &client,
+        Some(&cache),
+        &c,
+        &weather::Args {
+            date: "1850-06-15".into(),
+            longitude: "4.49".into(),
+            latitude: "52.16".into(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--limit"), "msg: {}", err.message());
+}
+
+#[test]
+fn weather_validates_latitude_decimal() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let err = weather::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &weather::Args {
+            date: "1850-06-15".into(),
+            longitude: "4.49".into(),
+            latitude: "not-a-number".into(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(
+        err.message().contains("--latitude"),
+        "msg: {}",
+        err.message()
+    );
+}

@@ -287,4 +287,74 @@ mod tests {
         assert_eq!(err.kind(), ErrorKind::Validation);
         assert!(err.message().contains("--year"));
     }
+
+    #[test]
+    fn parse_rest_province_space_form() {
+        let a = parse_rest(&strs(&["--year=1850", "--gg-uri=gg:1", "--province", "ZH"])).unwrap();
+        assert_eq!(a.province.as_deref(), Some("ZH"));
+    }
+
+    #[test]
+    fn parse_rest_province_eq_form() {
+        let a = parse_rest(&strs(&["--year=1850", "--gg-uri=gg:1", "--province=ZH"])).unwrap();
+        assert_eq!(a.province.as_deref(), Some("ZH"));
+    }
+
+    #[test]
+    fn parse_rest_richness_space_form() {
+        let a = parse_rest(&strs(&["--year=1850", "--place=Leiden", "--richness", "3"])).unwrap();
+        assert_eq!(a.richness, Some(3));
+    }
+
+    #[test]
+    fn parse_rest_richness_not_integer_is_validation_error() {
+        let err =
+            parse_rest(&strs(&["--year=1850", "--place=Leiden", "--richness=x"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--richness"));
+    }
+
+    #[test]
+    fn parse_rest_empty_value_is_validation_error() {
+        let err = parse_rest(&strs(&["--year=1850", "--place="])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--place"));
+    }
+
+    #[test]
+    fn parse_rest_flag_followed_by_flag_is_validation_error() {
+        let err = parse_rest(&strs(&["--year", "--place=Leiden"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--year"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn parse_rest_flag_at_end_is_validation_error() {
+        let err = parse_rest(&strs(&["--place=Leiden", "--year"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--year"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn parse_rest_gg_uri_space_form() {
+        let a = parse_rest(&strs(&["--year", "1850", "--gg-uri", "gg:42"])).unwrap();
+        assert_eq!(a.year, 1850);
+        assert_eq!(a.gg_uri.as_deref(), Some("gg:42"));
+    }
+
+    #[test]
+    fn parse_rest_place_space_form() {
+        let a = parse_rest(&strs(&["--year=1850", "--place", "Leiden"])).unwrap();
+        assert_eq!(a.place.as_deref(), Some("Leiden"));
+    }
+
+    #[test]
+    fn schema_returns_correct_command_name() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "census");
+        assert_eq!(cmd.response_shape, "single-nested");
+        let richness = cmd.args.iter().find(|a| a.name == "--richness").unwrap();
+        assert_eq!(richness.min, Some(1));
+        assert_eq!(richness.max, Some(3));
+    }
 }

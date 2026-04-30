@@ -105,3 +105,61 @@ fn match_rejects_limit() {
 
     assert_eq!(err.kind(), ErrorKind::Validation);
 }
+
+#[test]
+fn match_rejects_unknown_lang() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let mut ctx = ctx();
+    ctx.lang = "de".into();
+
+    let err = match_record::run(
+        &client,
+        Some(&cache),
+        &ctx,
+        &match_record::Args {
+            name: "Jan Jansen".into(),
+            birth_year: 1850,
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--lang"), "msg: {}", err.message());
+}
+
+#[test]
+fn match_handles_empty_docs() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/match.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let r = match_record::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &match_record::Args {
+            name: "nobody".into(),
+            birth_year: 1850,
+        },
+    )
+    .unwrap();
+
+    let envelope = r.list_envelope(r.total);
+    assert_eq!(envelope["items"].as_array().unwrap().len(), 0);
+}

@@ -188,3 +188,87 @@ fn show_rejects_fields_for_nested() {
         err.message()
     );
 }
+
+#[test]
+fn show_rejects_unknown_lang() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let mut ctx = ctx();
+    ctx.lang = "de".into();
+
+    let err = show::run(
+        &client,
+        Some(&cache),
+        &ctx,
+        &show::Args {
+            archive: "elo".into(),
+            identifier: "abc".into(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--lang"), "msg: {}", err.message());
+}
+
+#[test]
+fn show_rejects_limit_or_offset() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let mut ctx = ctx();
+    ctx.offset = Some(5);
+
+    let err = show::run(
+        &client,
+        Some(&cache),
+        &ctx,
+        &show::Args {
+            archive: "elo".into(),
+            identifier: "abc".into(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--limit"), "msg: {}", err.message());
+}
+
+#[test]
+fn show_null_body_is_not_found() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/show.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::Value::Null))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let err = show::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &show::Args {
+            archive: "elo".into(),
+            identifier: "ghost".into(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::NotFound);
+}

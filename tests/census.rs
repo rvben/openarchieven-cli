@@ -193,3 +193,72 @@ fn census_rejects_fields() {
     assert_eq!(err.kind(), ErrorKind::Validation);
     assert!(err.message().contains("--fields"));
 }
+
+#[test]
+fn census_rejects_limit() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let mut c = ctx();
+    c.limit = Some(10);
+
+    let err = census::run(
+        &client,
+        Some(&cache),
+        &c,
+        &census::Args {
+            year: 1850,
+            place: Some("Leiden".into()),
+            gg_uri: None,
+            province: None,
+            richness: None,
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(err.message().contains("--limit"), "msg: {}", err.message());
+}
+
+#[test]
+fn census_with_gg_uri_and_province_and_richness() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/related/census.json"))
+            .and(query_param("year", "1850"))
+            .and(query_param("gg_uri", "gg:1"))
+            .and(query_param("province", "ZH"))
+            .and(query_param("richness", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "census": {"year": 1850}
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let r = census::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &census::Args {
+            year: 1850,
+            place: None,
+            gg_uri: Some("gg:1".into()),
+            province: Some("ZH".into()),
+            richness: Some(2),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(r.shape, Shape::SingleNested);
+}

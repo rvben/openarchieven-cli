@@ -197,4 +197,29 @@ mod tests {
             err.message()
         );
     }
+
+    #[test]
+    fn parse_rest_flag_mid_positionals_is_validation_error() {
+        let err = parse_rest(&strs(&["a", "--flag", "b"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--flag"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn schema_returns_correct_shape() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "show");
+        assert_eq!(cmd.response_shape, "single-nested");
+        assert!(!cmd.paginated);
+        let archive = cmd.args.iter().find(|a| a.name == "archive").unwrap();
+        assert!(archive.required);
+        assert!(archive.positional);
+        let identifier = cmd.args.iter().find(|a| a.name == "identifier").unwrap();
+        assert!(identifier.required);
+        assert!(identifier.positional);
+        let lang = cmd.args.iter().find(|a| a.name == "--lang").unwrap();
+        assert!(!lang.required);
+        assert!(!lang.positional);
+        assert!(lang.r#enum.is_some());
+    }
 }

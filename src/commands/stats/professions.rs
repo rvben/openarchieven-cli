@@ -339,4 +339,46 @@ mod tests {
         let err = parse_rest(&strs(&["--place="])).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Validation);
     }
+
+    #[test]
+    fn parse_year_end_not_integer_is_validation_error() {
+        let err = parse_rest(&strs(&["--year-end=abc"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--year-end"));
+    }
+
+    #[test]
+    fn parse_flag_at_end_is_validation_error() {
+        let err = parse_rest(&strs(&["--place"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--place"), "msg: {}", err.message());
+    }
+
+    #[test]
+    fn parse_flag_followed_by_flag_is_validation_error() {
+        let err = parse_rest(&strs(&["--place", "--year-start"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn parse_unknown_flag_with_eq_unknown_key_is_validation_error() {
+        let err = parse_rest(&strs(&["--bogus=x"])).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+        assert!(err.message().contains("--bogus"));
+    }
+
+    #[test]
+    fn parse_year_end_space_form() {
+        let a = parse_rest(&strs(&["--year-end", "1900"])).unwrap();
+        assert_eq!(a.year_end, Some(1900));
+    }
+
+    #[test]
+    fn schema_returns_correct_command_name() {
+        let cmd = schema();
+        assert_eq!(cmd.name, "stats professions");
+        let lang_arg = cmd.args.iter().find(|a| a.name == "--lang").unwrap();
+        assert!(lang_arg.r#enum.is_some());
+        assert_eq!(lang_arg.r#enum.as_ref().unwrap().len(), 4);
+    }
 }
