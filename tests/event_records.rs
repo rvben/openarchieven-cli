@@ -391,3 +391,110 @@ fn marriages_with_event_year_filter() {
     let envelope = r.list_envelope(r.total);
     assert_eq!(envelope["total"], 1);
 }
+
+#[test]
+fn births_filters_year_clientside_when_upstream_returns_mixed() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/getBirths.json"))
+            .and(query_param("name", "jansen"))
+            .and(query_param("eventyear", "1900"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "response": {"numFound": 3, "docs": [
+                    {"id": "a", "eventdate": {"year": 1900}},
+                    {"id": "b", "eventdate": {"year": 1788}},
+                    {"id": "c", "eventdate": {"year": 1900}},
+                ]}
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let r = births::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &births::Args {
+            name: "jansen".into(),
+            flags: CommonFlags {
+                event_year: Some(1900),
+                event_place: None,
+                event_province: None,
+            },
+        },
+    )
+    .unwrap();
+
+    let envelope = r.list_envelope(r.total);
+    let items = envelope["items"].as_array().unwrap();
+    assert_eq!(
+        items.len(),
+        2,
+        "expected 2 docs after client-side year filter"
+    );
+    assert!(
+        items.iter().all(|d| d["eventdate"]["year"] == 1900),
+        "all returned docs must have eventdate.year == 1900"
+    );
+}
+
+#[test]
+fn births_keeps_docs_without_eventdate_year_when_event_year_set() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/records/getBirths.json"))
+            .and(query_param("name", "jansen"))
+            .and(query_param("eventyear", "1900"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "response": {"numFound": 3, "docs": [
+                    {"id": "a", "eventdate": {"year": 1900}},
+                    {"id": "b"},
+                    {"id": "c", "eventdate": {"year": 1850}},
+                ]}
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = make_client(&server);
+
+    let r = births::run(
+        &client,
+        Some(&cache),
+        &ctx(),
+        &births::Args {
+            name: "jansen".into(),
+            flags: CommonFlags {
+                event_year: Some(1900),
+                event_place: None,
+                event_province: None,
+            },
+        },
+    )
+    .unwrap();
+
+    let envelope = r.list_envelope(r.total);
+    let items = envelope["items"].as_array().unwrap();
+    // doc "a" (year 1900) and doc "b" (no eventdate.year) are kept; doc "c" (year 1850) is dropped
+    assert_eq!(items.len(), 2, "docs missing eventdate.year must be kept");
+    let ids: Vec<_> = items.iter().map(|d| d["id"].as_str().unwrap()).collect();
+    assert!(ids.contains(&"a"), "doc with matching year must be kept");
+    assert!(
+        ids.contains(&"b"),
+        "doc without eventdate.year must be kept"
+    );
+    assert!(
+        !ids.contains(&"c"),
+        "doc with non-matching year must be dropped"
+    );
+}

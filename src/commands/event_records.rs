@@ -95,6 +95,24 @@ pub fn run_event(
         .cloned()
         .unwrap_or_default();
 
+    // The upstream API accepts `eventyear=` but does not reliably filter on it.
+    // Post-filter client-side to enforce the advertised behaviour. Docs that
+    // lack `eventdate.year` entirely are kept rather than silently dropped,
+    // because an absent year field should not cause valid records to vanish.
+    let items: Vec<serde_json::Value> = if let Some(yr) = flags.event_year {
+        items
+            .into_iter()
+            .filter(|d| {
+                d.pointer("/eventdate/year")
+                    .and_then(|v| v.as_i64())
+                    .map(|y| y as i32 == yr)
+                    .unwrap_or(true)
+            })
+            .collect()
+    } else {
+        items
+    };
+
     Ok(Renderable::list(
         serde_json::Value::Array(items),
         true,
