@@ -11,6 +11,8 @@ pub struct ArchiveStatArgs {
     pub archive: Option<String>,
 }
 
+/// `items_pointer` is the legacy wrapped-shape pointer (e.g. `/records`).
+/// Upstream now returns a bare array; the wrapped form is accepted as a fallback.
 pub fn run_archive_stat(
     command_name: &str,
     path: &str,
@@ -40,11 +42,14 @@ pub fn run_archive_stat(
 
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
     let body = client.get_cached(path, &params, ttl, cache)?;
-    let items = body
-        .pointer(items_pointer)
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let items = match &body {
+        serde_json::Value::Array(arr) => arr.clone(),
+        _ => body
+            .pointer(items_pointer)
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default(),
+    };
     let total = items.len() as u64;
     Ok(
         Renderable::list(serde_json::Value::Array(items), false, None, None)

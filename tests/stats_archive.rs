@@ -50,12 +50,10 @@ fn stats_records_returns_list_with_total() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/stats/records.json"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "records": [
-                    {"archive": "elo", "count": 1000},
-                    {"archive": "saa", "count": 5000}
-                ]
-            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {"archive": "elo", "count": 1000},
+                {"archive": "saa", "count": 5000}
+            ])))
             .mount(&server)
             .await;
     });
@@ -82,7 +80,7 @@ fn stats_sources_filters_by_archive() {
         Mock::given(method("GET"))
             .and(path("/stats/sources.json"))
             .and(query_param("archive_code", "elo"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"sources": []})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
             .mount(&server)
             .await;
     });
@@ -112,9 +110,9 @@ fn stats_events_basic() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/stats/events.json"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "events": [{"e": "birth"}, {"e": "death"}, {"e": "marriage"}]
-            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {"e": "birth"}, {"e": "death"}, {"e": "marriage"}
+            ])))
             .mount(&server)
             .await;
     });
@@ -135,7 +133,7 @@ fn stats_comments_basic() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/stats/comments.json"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"comments": [{"c": 1}]})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([{"c": 1}])))
             .mount(&server)
             .await;
     });
