@@ -1481,6 +1481,22 @@ fn no_cache_flag_works_before_subcommand() {
 }
 
 #[test]
+fn global_flag_propagates_through_nested_stats_subcommand() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/records.json",
+        json!({"records": [{"archive_code": "elo", "count": 100}]}),
+    );
+    let out = env
+        .cmd()
+        .args(["--no-cache", "stats", "records"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["archive_code"], "elo");
+}
+
+#[test]
 fn fields_flag_works_before_subcommand() {
     let env = Env::new();
     env.mount_get_with_params(
