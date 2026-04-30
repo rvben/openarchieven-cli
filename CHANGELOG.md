@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 
 
+
+## [0.3.0](https://github.com/rvben/openarchieven-cli/compare/v0.2.1...v0.3.0) - 2026-04-30
+
+### Added
+
+- **transcripts**: add `transcripts {search,browse,show}` subcommands ([7817c59](https://github.com/rvben/openarchieven-cli/commit/7817c5932c7ac66091999e359da23d841d8feae5))
+
 ## [0.2.1](https://github.com/rvben/openarchieven-cli/compare/v0.2.0...v0.2.1) - 2026-04-30
 
 ### Added
