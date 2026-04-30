@@ -13,6 +13,8 @@ brew install rvben/tap/openarchieven
 uvx openarchieven --help
 ```
 
+Both `openarchieven` and the short alias `oa` are installed.
+
 ## Usage
 
 ```bash

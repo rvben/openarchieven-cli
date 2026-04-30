@@ -9,3 +9,6 @@ pub mod output;
 pub mod runtime;
 pub mod schema_cmd;
 pub mod tty;
+
+mod entry;
+pub use entry::main_entry;

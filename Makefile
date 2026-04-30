@@ -23,6 +23,7 @@ install:
 	cargo build --release
 	mkdir -p $(HOME)/.local/bin
 	cp target/release/openarchieven $(HOME)/.local/bin/openarchieven
+	cp target/release/oa $(HOME)/.local/bin/oa
 
 release-patch:
 	vership bump patch
