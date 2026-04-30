@@ -67,6 +67,10 @@ pub enum Cmd {
     #[command(subcommand)]
     Stats(StatsCmd),
 
+    /// Page-transcription endpoints (search, browse, show).
+    #[command(subcommand)]
+    Transcripts(TranscriptsCmd),
+
     /// Cache management.
     #[command(subcommand)]
     Cache(CacheCmd),
@@ -101,6 +105,76 @@ pub enum StatsCmd {
     /// Profession frequency stats.
     #[command(after_help = STATS_PROFESSIONS_EXAMPLES)]
     Professions(StatsProfessionsArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TranscriptsCmd {
+    /// Full-text search across page transcriptions.
+    #[command(after_help = TRANSCRIPTS_SEARCH_EXAMPLES)]
+    Search(TranscriptsSearchArgs),
+    /// Hierarchical browse (archives → archive numbers → inventories).
+    #[command(after_help = TRANSCRIPTS_BROWSE_EXAMPLES)]
+    Browse(TranscriptsBrowseArgs),
+    /// Retrieve a single transcription by id.
+    #[command(after_help = TRANSCRIPTS_SHOW_EXAMPLES)]
+    Show(TranscriptsShowArgs),
+}
+
+const TRANSCRIPTS_SEARCH_EXAMPLES: &str = "\
+Examples:
+  openarchieven transcripts search coret
+  openarchieven transcripts search \"van der berg\" --archive-code hua --year-start 1700
+  openarchieven -o json transcripts search coret | jq '.items[0]'
+";
+
+#[derive(Debug, clap::Args)]
+pub struct TranscriptsSearchArgs {
+    /// Free-text query. Wrap in double quotes for an exact phrase match.
+    pub q: String,
+    /// Filter by archive code (e.g. `hua`, `rzh`). List with `transcripts browse`.
+    #[arg(long)]
+    pub archive_code: Option<String>,
+    /// Filter by archive number (archieftoegang) within `--archive-code`.
+    #[arg(long)]
+    pub archive_number: Option<String>,
+    /// Filter by inventory number within `--archive-number`.
+    #[arg(long)]
+    pub inventory_number: Option<String>,
+    /// Filter on inventory start year (YYYY).
+    #[arg(long)]
+    pub year_start: Option<i32>,
+    /// Filter on inventory end year (YYYY).
+    #[arg(long)]
+    pub year_end: Option<i32>,
+}
+
+const TRANSCRIPTS_BROWSE_EXAMPLES: &str = "\
+Examples:
+  openarchieven transcripts browse                                # all archives
+  openarchieven transcripts browse --archive-code hua             # archive numbers in hua
+  openarchieven transcripts browse --archive-code hua --archive-number 67
+";
+
+#[derive(Debug, clap::Args)]
+pub struct TranscriptsBrowseArgs {
+    /// Archive code (e.g. `hua`).
+    #[arg(long)]
+    pub archive_code: Option<String>,
+    /// Archive number (archieftoegang); requires `--archive-code`.
+    #[arg(long)]
+    pub archive_number: Option<String>,
+}
+
+const TRANSCRIPTS_SHOW_EXAMPLES: &str = "\
+Examples:
+  openarchieven transcripts show NL-SdmGA_1504889_11
+  openarchieven -o json transcripts show NL-SdmGA_1504889_11 | jq '.transcript'
+";
+
+#[derive(Debug, clap::Args)]
+pub struct TranscriptsShowArgs {
+    /// Page identifier in the form `<ISIL>_<archive_number>_<page>`.
+    pub id: String,
 }
 
 #[derive(Debug, Subcommand)]

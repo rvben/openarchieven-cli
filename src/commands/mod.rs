@@ -15,5 +15,6 @@ pub mod match_record;
 pub mod search;
 pub mod show;
 pub mod stats;
+pub mod transcripts;
 pub mod weather;
 pub mod yearsago;

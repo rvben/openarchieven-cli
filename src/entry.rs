@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use clap::error::ErrorKind as ClapErrorKind;
 
-use crate::cli::{CacheCmd, Cli, Cmd, StatsCmd};
+use crate::cli::{CacheCmd, Cli, Cmd, StatsCmd, TranscriptsCmd};
 use crate::error::{Error, ErrorKind, emit_json};
 
 /// Returns `true` when `NO_COLOR` is set to a non-empty value.
@@ -296,6 +296,47 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                     year_end,
                 };
                 crate::commands::stats::professions::run(client, cache, ctx, &typed)
+            })
+        }
+        Cmd::Transcripts(TranscriptsCmd::Search(args)) => {
+            let crate::cli::TranscriptsSearchArgs {
+                q,
+                archive_code,
+                archive_number,
+                inventory_number,
+                year_start,
+                year_end,
+            } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
+                let typed = crate::commands::transcripts::search::Args {
+                    q,
+                    archive_code,
+                    archive_number,
+                    inventory_number,
+                    year_start,
+                    year_end,
+                };
+                crate::commands::transcripts::search::run(client, cache, ctx, &typed)
+            })
+        }
+        Cmd::Transcripts(TranscriptsCmd::Browse(args)) => {
+            let crate::cli::TranscriptsBrowseArgs {
+                archive_code,
+                archive_number,
+            } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
+                let typed = crate::commands::transcripts::browse::Args {
+                    archive_code,
+                    archive_number,
+                };
+                crate::commands::transcripts::browse::run(client, cache, ctx, &typed)
+            })
+        }
+        Cmd::Transcripts(TranscriptsCmd::Show(args)) => {
+            let crate::cli::TranscriptsShowArgs { id } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
+                let typed = crate::commands::transcripts::show::Args { id };
+                crate::commands::transcripts::show::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Cache(CacheCmd::Info) => run_cache_op(&global, crate::commands::cache_cmd::info),

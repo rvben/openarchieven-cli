@@ -1063,6 +1063,194 @@ expression: s
       ]
     },
     {
+      "name": "transcripts search",
+      "description": "Full-text search across page transcriptions of historical documents.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": true,
+      "cache_ttl_seconds": 21600,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "q",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--archive-code",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--archive-number",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--inventory-number",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--year-start",
+          "type": "integer",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--year-end",
+          "type": "integer",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 10,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "--offset",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 0,
+          "min": 0
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de",
+            "fr"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<transcription_match>"
+        },
+        {
+          "name": "total",
+          "type": "integer | null"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "offset",
+          "type": "integer"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "transcripts browse",
+      "description": "Hierarchical browse of available page transcriptions: archives → archive numbers → inventories.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 604800,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "--archive-code",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--archive-number",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de",
+            "fr"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<browse_item>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "null"
+        },
+        {
+          "name": "offset",
+          "type": "null"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "transcripts show",
+      "description": "Retrieve the full transcript of a single page by id (immutable; cached forever).",
+      "mutating": false,
+      "response_shape": "single-nested",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "never",
+      "args": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de",
+            "fr"
+          ]
+        }
+      ],
+      "output_fields": []
+    },
+    {
       "name": "cache info",
       "description": "Show cache location, total size, and entry count",
       "mutating": false,

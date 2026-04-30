@@ -1609,3 +1609,84 @@ fn fields_flag_works_before_subcommand() {
     assert_eq!(item.len(), 1);
     assert_eq!(item["id"], "r-1");
 }
+
+#[test]
+fn transcripts_search_dispatch_sends_q_and_filters() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/transcriptions/search.json",
+        &[
+            ("q", "coret"),
+            ("archive_code", "hua"),
+            ("lang", "nl"),
+            ("number_show", "10"),
+            ("start", "0"),
+        ],
+        json!({
+            "response": {"number_found": 7, "docs": [{"id": "NL-X_1_1", "page": "1"}]}
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["transcripts", "search", "--archive-code", "hua", "coret"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["total"], 7);
+    assert_eq!(v["paginated"], true);
+    assert_eq!(v["items"][0]["id"], "NL-X_1_1");
+}
+
+#[test]
+fn transcripts_browse_dispatch_no_filters() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/transcriptions/browse.json",
+        &[("lang", "nl")],
+        json!({
+            "filters": {"archive_code": null, "archive_number": null},
+            "response": {"level": 1, "docs": [
+                {"isil": "NL-HaNA", "archive_code": "rzh", "name": "Nationaal Archief", "count": 100}
+            ]}
+        }),
+    );
+    let out = env.cmd().args(["transcripts", "browse"]).assert().success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["paginated"], false);
+    assert_eq!(v["items"][0]["archive_code"], "rzh");
+}
+
+#[test]
+fn transcripts_show_dispatch_returns_nested_transcript() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/transcriptions/show.json",
+        &[("id", "NL-SdmGA_1504889_11"), ("lang", "nl")],
+        json!({
+            "id": "NL-SdmGA_1504889_11",
+            "transcript": "lorem ipsum"
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["transcripts", "show", "NL-SdmGA_1504889_11"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["id"], "NL-SdmGA_1504889_11");
+    assert_eq!(v["transcript"], "lorem ipsum");
+}
+
+#[test]
+fn transcripts_show_404_is_not_found_with_stderr_error() {
+    let env = Env::new();
+    env.mount_status("/transcriptions/show.json", 404);
+    let out = env
+        .cmd()
+        .args(["transcripts", "show", "NL-X_0_0"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "not_found");
+}
