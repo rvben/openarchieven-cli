@@ -44,7 +44,7 @@ pub enum Cmd {
     Show(ApiArgs),
     /// Score-matched record lookup.
     #[command(name = "match")]
-    MatchCmd(ApiArgs),
+    MatchCmd(MatchArgs),
     /// Birth-event records.
     Births(BirthsArgs),
     /// Death-event records.
@@ -145,6 +145,23 @@ pub struct GlobalApiArgs {
     /// Response language.
     #[arg(long)]
     pub lang: Option<String>,
+}
+
+const MATCH_EXAMPLES: &str = "\
+Examples:
+  openarchieven match \"Pieter Jansen\" 1898
+  openarchieven -o json match \"Anna de Vries\" 1925 | jq '.items[0]'
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = MATCH_EXAMPLES)]
+pub struct MatchArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Person name to match.
+    pub name: String,
+    /// Birth year (YYYY).
+    pub birth_year: i32,
 }
 
 const SEARCH_EXAMPLES: &str = "\

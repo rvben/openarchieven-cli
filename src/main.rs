@@ -119,10 +119,17 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let parsed = openarchieven::commands::show::parse_rest(rest)?;
             openarchieven::commands::show::run(client, cache, ctx, &parsed)
         }),
-        Cmd::MatchCmd(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::match_record::parse_rest(rest)?;
-            openarchieven::commands::match_record::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::MatchCmd(args) => {
+            let openarchieven::cli::MatchArgs {
+                global: global_api,
+                name,
+                birth_year,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::match_record::Args { name, birth_year };
+                openarchieven::commands::match_record::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Births(args) => {
             let openarchieven::cli::BirthsArgs {
                 global: global_api,

@@ -1015,3 +1015,23 @@ fn search_rejects_sort_zero_at_argument_parse() {
     let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
     assert!(stderr.contains("--sort"), "stderr: {stderr}");
 }
+
+#[test]
+fn match_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["match", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("<NAME>"), "help: {s}");
+    assert!(s.contains("<BIRTH_YEAR>"), "help: {s}");
+    assert!(s.contains("Examples:"), "help: {s}");
+    assert!(s.contains("Pieter Jansen"), "help: {s}");
+}

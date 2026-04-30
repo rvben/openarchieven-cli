@@ -56,41 +56,6 @@ pub fn run(
     Ok(Renderable::list(serde_json::Value::Array(items), false, None, None).with_total(total))
 }
 
-pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let mut positional: Vec<String> = Vec::new();
-    for tok in rest {
-        if tok.starts_with("--") {
-            return Err(Error::new(
-                ErrorKind::Validation,
-                format!("unknown flag {tok} for `match`; no per-command flags supported"),
-            ));
-        }
-        positional.push(tok.clone());
-    }
-    if positional.len() != 2 {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!(
-                "match: expected 2 positional args (<name> <birthyear>), got {}",
-                positional.len()
-            ),
-        ));
-    }
-    let birth_year: i32 = positional[1].parse().map_err(|_| {
-        Error::new(
-            ErrorKind::Validation,
-            format!(
-                "match: birthyear must be an integer, got {:?}",
-                positional[1]
-            ),
-        )
-    })?;
-    Ok(Args {
-        name: positional[0].clone(),
-        birth_year,
-    })
-}
-
 pub fn schema() -> Command {
     Command {
         name: "match",
@@ -152,54 +117,6 @@ pub fn schema() -> Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn strs(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn parse_rest_two_positionals_ok() {
-        let a = parse_rest(&strs(&["jansen", "1850"])).unwrap();
-        assert_eq!(a.name, "jansen");
-        assert_eq!(a.birth_year, 1850);
-    }
-
-    #[test]
-    fn parse_rest_one_positional_is_validation_error() {
-        let err = parse_rest(&strs(&["jansen"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-    }
-
-    #[test]
-    fn parse_rest_non_integer_birthyear_is_validation_error() {
-        let err = parse_rest(&strs(&["jansen", "abc"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("birthyear"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn parse_rest_unknown_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["--zzz", "jansen", "1850"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-    }
-
-    #[test]
-    fn parse_rest_three_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&["a", "1850", "extra"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("match"), "msg: {}", err.message());
-    }
-
-    #[test]
-    fn parse_rest_zero_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&[])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("match"), "msg: {}", err.message());
-    }
 
     #[test]
     fn schema_returns_correct_shape() {
