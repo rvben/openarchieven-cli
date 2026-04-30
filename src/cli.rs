@@ -54,7 +54,7 @@ pub enum Cmd {
     /// Anniversary records.
     Yearsago(YearsagoArgs),
     /// List archives.
-    Archives(ApiArgs),
+    Archives(ArchivesArgs),
     /// Census records by place/year.
     Census(ApiArgs),
     /// Historical weather observations.
@@ -160,6 +160,17 @@ pub struct YearsagoArgs {
     pub global: GlobalApiArgs,
     /// Number of years ago.
     pub years: u32,
+}
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = "\
+Examples:
+  openarchieven archives
+  openarchieven -o json archives | jq '.items[] | .archive_code' | head
+")]
+pub struct ArchivesArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
 }
 
 const MATCH_EXAMPLES: &str = "\

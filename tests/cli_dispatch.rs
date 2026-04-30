@@ -880,7 +880,7 @@ fn no_color_empty_string_does_not_disable() {
 }
 
 // ---------------------------------------------------------------------------
-// births --help: typed-Args migration asserts real positionals/flags shown.
+// --help: typed-Args migration asserts real positionals/flags shown.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -1075,4 +1075,32 @@ fn yearsago_help_shows_real_args_and_examples() {
     assert!(s.contains("<YEARS>"), "help: {s}");
     assert!(s.contains("Examples:"), "help: {s}");
     assert!(s.contains("100 years ago"), "help: {s}");
+}
+
+#[test]
+fn archives_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["archives", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(
+        s.contains("Examples:"),
+        "help should have Examples block: {s}"
+    );
+    assert!(
+        s.contains("openarchieven archives"),
+        "help must show archives example: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
 }

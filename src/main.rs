@@ -86,9 +86,12 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let json = serde_json::to_string_pretty(&schema).expect("schema always serializes");
             write_stdout(|out| writeln!(out, "{json}"))
         }
-        Cmd::Archives(args) => run_endpoint(args, &global, |client, cache, ctx, _rest| {
-            openarchieven::commands::archives::run(client, cache, ctx)
-        }),
+        Cmd::Archives(args) => {
+            let openarchieven::cli::ArchivesArgs { global: global_api } = args;
+            run_typed_endpoint(global_api, &global, |client, cache, ctx| {
+                openarchieven::commands::archives::run(client, cache, ctx)
+            })
+        }
         Cmd::Search(args) => {
             let openarchieven::cli::SearchArgs {
                 global: global_api,
