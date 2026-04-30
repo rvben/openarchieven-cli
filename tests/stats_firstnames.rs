@@ -49,7 +49,7 @@ fn firstnames_returns_list_with_required_args() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/stats/firstnames.json"))
-            .and(query_param("place", "Leiden"))
+            .and(query_param("eventplace", "Leiden"))
             .and(query_param("eventyear", "1850"))
             .and(query_param("number_show", "20"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
