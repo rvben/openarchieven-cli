@@ -233,9 +233,11 @@ fn render_table<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()> {
                 let row: Vec<String> = match item {
                     Value::Object(o) => headers
                         .iter()
-                        .map(|h| match o.get(h).cloned().unwrap_or(Value::Null) {
-                            Value::String(s) => truncate(&s, 80),
-                            other => truncate(&other.to_string(), 80),
+                        .map(|h| {
+                            match humanise_value(h, &o.get(h).cloned().unwrap_or(Value::Null)) {
+                                Value::String(s) => truncate(&s, 80),
+                                other => truncate(&other.to_string(), 80),
+                            }
                         })
                         .collect(),
                     Value::Null => vec!["".into()],
@@ -289,7 +291,9 @@ fn render_markdown<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()>
                 let cells: Vec<String> = match item {
                     Value::Object(o) => headers
                         .iter()
-                        .map(|h| md_cell(o.get(h).cloned().unwrap_or(Value::Null)))
+                        .map(|h| {
+                            md_cell(humanise_value(h, &o.get(h).cloned().unwrap_or(Value::Null)))
+                        })
                         .collect(),
                     other => vec![md_cell(other.clone())],
                 };
@@ -299,22 +303,23 @@ fn render_markdown<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()>
         Shape::SingleFlat => {
             if let Value::Object(o) = &r.body {
                 for (k, v) in o.iter() {
-                    writeln!(out, "- **{k}**: {}", md_cell(v.clone()))?;
+                    writeln!(out, "- **{k}**: {}", md_cell(humanise_value(k, v)))?;
                 }
             }
         }
         Shape::SingleNested => {
             if let Value::Object(o) = &r.body {
                 for (k, v) in o.iter() {
-                    match v {
+                    let hv = humanise_value(k, v);
+                    match hv {
                         Value::Object(_) | Value::Array(_) => {
                             writeln!(out, "- **{k}**:")?;
                             writeln!(out, "```json")?;
-                            serde_json::to_writer_pretty(&mut *out, v)?;
+                            serde_json::to_writer_pretty(&mut *out, &hv)?;
                             writeln!(out)?;
                             writeln!(out, "```")?;
                         }
-                        _ => writeln!(out, "- **{k}**: {}", md_cell(v.clone()))?,
+                        _ => writeln!(out, "- **{k}**: {}", md_cell(hv))?,
                     }
                 }
             }
@@ -332,6 +337,27 @@ fn md_cell(v: Value) -> String {
             truncate(&s.replace('|', "\\|"), 200)
         }
         other => other.to_string(),
+    }
+}
+
+fn humanise_value(field: &str, v: &Value) -> Value {
+    match (field, v) {
+        ("eventdate", Value::Object(o))
+        | ("birthdate", Value::Object(o))
+        | ("deathdate", Value::Object(o)) => {
+            let d = o.get("day").and_then(Value::as_i64);
+            let m = o.get("month").and_then(Value::as_i64);
+            let y = o.get("year").and_then(Value::as_i64);
+            if let (Some(d), Some(m), Some(y)) = (d, m, y) {
+                return Value::String(format!("{d:02}-{m:02}-{y:04}"));
+            }
+            v.clone()
+        }
+        ("personname", Value::String(s)) => {
+            let trimmed = s.trim_start_matches('#').trim_start();
+            Value::String(trimmed.to_string())
+        }
+        _ => v.clone(),
     }
 }
 
@@ -865,5 +891,32 @@ mod tests {
         assert_eq!(truncate(&s, 5), "αβγδε");
         let result = truncate(&s, 4);
         assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn table_renders_eventdate_as_iso_dmy() {
+        let r = Renderable::list(
+            json!([{"eventdate": {"day": 31, "month": 5, "year": 1895}, "personname": "# Jansen"}]),
+            false,
+            None,
+            None,
+        );
+        let mut buf = Vec::new();
+        render_table(&mut buf, &r).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("31-05-1895"), "table:\n{s}");
+        assert!(!s.contains("\"day\""), "raw json leaked: {s}");
+        assert!(s.contains(" Jansen"), "personname not stripped: {s}");
+        assert!(!s.contains("# Jansen"), "personname header leaked: {s}");
+    }
+
+    #[test]
+    fn markdown_strips_personname_heading() {
+        let r = Renderable::list(json!([{"personname": "# Jansen-Walet"}]), false, None, None);
+        let mut buf = Vec::new();
+        render_markdown(&mut buf, &r).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(!s.contains("| # Jansen"), "markdown:\n{s}");
+        assert!(s.contains("| Jansen-Walet |"), "markdown:\n{s}");
     }
 }
