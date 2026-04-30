@@ -118,10 +118,20 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::search::run(client, cache, ctx, &typed)
             })
         }
-        Cmd::Show(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::show::parse_rest(rest)?;
-            openarchieven::commands::show::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::Show(args) => {
+            let openarchieven::cli::ShowArgs {
+                global: global_api,
+                archive,
+                identifier,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::show::Args {
+                    archive,
+                    identifier,
+                };
+                openarchieven::commands::show::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::MatchCmd(args) => {
             let openarchieven::cli::MatchArgs {
                 global: global_api,

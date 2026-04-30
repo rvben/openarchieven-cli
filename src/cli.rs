@@ -41,7 +41,7 @@ pub enum Cmd {
     /// Free-text record search.
     Search(SearchArgs),
     /// Show a single record by archive + identifier.
-    Show(ApiArgs),
+    Show(ShowArgs),
     /// Score-matched record lookup.
     #[command(name = "match")]
     MatchCmd(MatchArgs),
@@ -224,6 +224,23 @@ pub struct WeatherArgs {
     /// Decimal longitude.
     #[arg(long, value_parser = parse_decimal_str)]
     pub longitude: String,
+}
+
+const SHOW_EXAMPLES: &str = "\
+Examples:
+  openarchieven show srt EC1E458F-AEF6-45FB-B184-656B765BE973
+  openarchieven -o json show elo abc123 | jq '.Person'
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = SHOW_EXAMPLES)]
+pub struct ShowArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Archive code (e.g. `srt`, `elo`, `saa`). List with `openarchieven archives`.
+    pub archive: String,
+    /// Record identifier within that archive.
+    pub identifier: String,
 }
 
 const MATCH_EXAMPLES: &str = "\

@@ -81,32 +81,6 @@ pub fn run(
     Ok(Renderable::single_nested(body))
 }
 
-pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let mut positional: Vec<String> = Vec::new();
-    for tok in rest {
-        if tok.starts_with("--") {
-            return Err(Error::new(
-                ErrorKind::Validation,
-                format!("unknown flag {tok} for `show`; no per-command flags supported"),
-            ));
-        }
-        positional.push(tok.clone());
-    }
-    if positional.len() != 2 {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!(
-                "show: expected 2 positional args (<archive> <identifier>), got {}",
-                positional.len()
-            ),
-        ));
-    }
-    Ok(Args {
-        archive: positional[0].clone(),
-        identifier: positional[1].clone(),
-    })
-}
-
 pub fn schema() -> Command {
     Command {
         name: "show",
@@ -156,68 +130,6 @@ pub fn schema() -> Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn strs(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn parse_rest_zero_positionals_is_validation_error() {
-        let err = parse_rest(&[]).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("expected 2"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn parse_rest_one_positional_is_validation_error() {
-        let err = parse_rest(&strs(&["a"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("expected 2"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn parse_rest_three_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&["a", "b", "c"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("expected 2"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn parse_rest_two_positionals_ok() {
-        let a = parse_rest(&strs(&["a", "b"])).unwrap();
-        assert_eq!(a.archive, "a");
-        assert_eq!(a.identifier, "b");
-    }
-
-    #[test]
-    fn parse_rest_unknown_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["--zzz", "a", "b"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("--zzz"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn parse_rest_flag_mid_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&["a", "--flag", "b"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--flag"), "msg: {}", err.message());
-    }
 
     #[test]
     fn schema_returns_correct_shape() {
