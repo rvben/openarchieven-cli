@@ -23,12 +23,10 @@ fn archives_returns_list_with_total_and_paginated_false() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/stats/archives.json"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "archives": [
-                    {"archive_code": "elo", "archive_name": "Erfgoed Leiden"},
-                    {"archive_code": "saa", "archive_name": "Stadsarchief Amsterdam"}
-                ]
-            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {"archive_code": "elo", "archive_name": "Erfgoed Leiden"},
+                {"archive_code": "saa", "archive_name": "Stadsarchief Amsterdam"}
+            ])))
             .mount(&server)
             .await;
     });
@@ -61,6 +59,47 @@ fn archives_returns_list_with_total_and_paginated_false() {
     assert_eq!(envelope["total"], 2);
     assert_eq!(envelope["items"].as_array().unwrap().len(), 2);
     assert_eq!(envelope["items"][0]["archive_code"], "elo");
+}
+
+#[test]
+fn archives_tolerates_legacy_wrapped_shape() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+    rt.block_on(async {
+        Mock::given(method("GET"))
+            .and(path("/stats/archives.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "archives": [{"archive_code": "elo"}]
+            })))
+            .mount(&server)
+            .await;
+    });
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = Client::new(ClientConfig {
+        base_url: server.uri(),
+        timeout: Duration::from_secs(2),
+        lang: "nl".into(),
+        rate_limit_per_sec: 1000,
+        cache_mode: CacheMode::Default,
+    })
+    .unwrap();
+    let ctx = ApiContext {
+        timeout: Duration::from_secs(2),
+        cache_mode: CacheMode::Default,
+        cache_ttl_override: None,
+        cache_dir: None,
+        fields: None,
+        limit: None,
+        offset: None,
+        lang: "nl".into(),
+    };
+
+    let r = archives::run(&client, Some(&cache), &ctx).unwrap();
+    let env = r.list_envelope(None);
+    assert_eq!(env["total"], 1);
+    assert_eq!(env["items"][0]["archive_code"], "elo");
 }
 
 #[test]

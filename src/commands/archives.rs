@@ -24,12 +24,19 @@ pub fn run(client: &Client, cache: Option<&Cache>, ctx: &ApiContext) -> Result<R
     let ttl = resolve_ttl(ctx, default_ttl());
     let body = client.get_cached("/stats/archives.json", &[], ttl, cache)?;
 
-    let items = body
-        .get("archives")
-        .cloned()
-        .unwrap_or_else(|| serde_json::json!([]));
+    let items = match body {
+        serde_json::Value::Array(items) => serde_json::Value::Array(items),
+        // Tolerate the documented `{"archives": [...]}` form too in case upstream
+        // ever adds a wrapper.
+        serde_json::Value::Object(ref m) => m
+            .get("archives")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([])),
+        _ => serde_json::json!([]),
+    };
 
-    Ok(Renderable::list(items, false, None, None))
+    let total = items.as_array().map(|a| a.len() as u64);
+    Ok(Renderable::list(items, false, None, None).with_total(total))
 }
 
 fn default_ttl() -> TtlHint {
