@@ -234,7 +234,7 @@ fn render_table<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()> {
                     Value::Object(o) => headers
                         .iter()
                         .map(|h| {
-                            match humanise_value(h, &o.get(h).cloned().unwrap_or(Value::Null)) {
+                            match humanise_value(h, o.get(h).cloned().unwrap_or(Value::Null)) {
                                 Value::String(s) => truncate(&s, 80),
                                 other => truncate(&other.to_string(), 80),
                             }
@@ -250,10 +250,11 @@ fn render_table<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()> {
             t.set_header(["key", "value"]);
             if let Value::Object(o) = &r.body {
                 for (k, v) in o.iter() {
-                    let s = match v {
+                    let hv = humanise_value(k, v.clone());
+                    let s = match &hv {
                         Value::String(s) => truncate(s, 80),
                         Value::Object(_) | Value::Array(_) => {
-                            truncate(&serde_json::to_string(v).unwrap_or_default(), 80)
+                            truncate(&serde_json::to_string(&hv).unwrap_or_default(), 80)
                         }
                         other => other.to_string(),
                     };
@@ -292,7 +293,7 @@ fn render_markdown<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()>
                     Value::Object(o) => headers
                         .iter()
                         .map(|h| {
-                            md_cell(humanise_value(h, &o.get(h).cloned().unwrap_or(Value::Null)))
+                            md_cell(humanise_value(h, o.get(h).cloned().unwrap_or(Value::Null)))
                         })
                         .collect(),
                     other => vec![md_cell(other.clone())],
@@ -303,14 +304,14 @@ fn render_markdown<W: Write>(out: &mut W, r: &Renderable) -> std::io::Result<()>
         Shape::SingleFlat => {
             if let Value::Object(o) = &r.body {
                 for (k, v) in o.iter() {
-                    writeln!(out, "- **{k}**: {}", md_cell(humanise_value(k, v)))?;
+                    writeln!(out, "- **{k}**: {}", md_cell(humanise_value(k, v.clone())))?;
                 }
             }
         }
         Shape::SingleNested => {
             if let Value::Object(o) = &r.body {
                 for (k, v) in o.iter() {
-                    let hv = humanise_value(k, v);
+                    let hv = humanise_value(k, v.clone());
                     match hv {
                         Value::Object(_) | Value::Array(_) => {
                             writeln!(out, "- **{k}**:")?;
@@ -340,7 +341,7 @@ fn md_cell(v: Value) -> String {
     }
 }
 
-fn humanise_value(field: &str, v: &Value) -> Value {
+fn humanise_value(field: &str, v: Value) -> Value {
     match (field, v) {
         ("eventdate", Value::Object(o))
         | ("birthdate", Value::Object(o))
@@ -349,15 +350,16 @@ fn humanise_value(field: &str, v: &Value) -> Value {
             let m = o.get("month").and_then(Value::as_i64);
             let y = o.get("year").and_then(Value::as_i64);
             if let (Some(d), Some(m), Some(y)) = (d, m, y) {
-                return Value::String(format!("{d:02}-{m:02}-{y:04}"));
+                Value::String(format!("{d:02}-{m:02}-{y:04}"))
+            } else {
+                Value::Object(o)
             }
-            v.clone()
         }
         ("personname", Value::String(s)) => {
             let trimmed = s.trim_start_matches('#').trim_start();
             Value::String(trimmed.to_string())
         }
-        _ => v.clone(),
+        (_, v) => v,
     }
 }
 
@@ -918,5 +920,27 @@ mod tests {
         let s = String::from_utf8(buf).unwrap();
         assert!(!s.contains("| # Jansen"), "markdown:\n{s}");
         assert!(s.contains("| Jansen-Walet |"), "markdown:\n{s}");
+    }
+
+    #[test]
+    fn table_renders_single_nested_eventdate_as_iso_dmy() {
+        let r =
+            Renderable::single_nested(json!({"eventdate": {"day": 7, "month": 8, "year": 1923}}));
+        let mut buf = Vec::new();
+        render_table(&mut buf, &r).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("07-08-1923"), "table:\n{s}");
+        assert!(!s.contains("\"day\""), "raw json leaked: {s}");
+    }
+
+    #[test]
+    fn table_renders_single_flat_eventdate_as_iso_dmy() {
+        let r =
+            Renderable::single_flat(json!({"eventdate": {"day": 15, "month": 3, "year": 1888}}));
+        let mut buf = Vec::new();
+        render_table(&mut buf, &r).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("15-03-1888"), "table:\n{s}");
+        assert!(!s.contains("\"day\""), "raw json leaked: {s}");
     }
 }
