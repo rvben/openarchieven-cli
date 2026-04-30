@@ -341,9 +341,36 @@ where
     let client = crate::runtime::build_client(&ctx)?;
     let cache = crate::runtime::build_cache(&ctx)?;
     let mut renderable = f(&client, cache.as_ref(), &ctx)?;
+    maybe_emit_truncation_note(&ctx, &renderable);
     if let Some(fields) = ctx.fields.as_deref() {
         renderable = crate::output::apply_fields_auto(renderable, fields)?;
     }
     let pretty = std::io::stdout().is_terminal();
     write_stdout(|out| crate::output::render(out, &renderable, global.format, pretty))
+}
+
+/// When the user did not pass `--limit` and the API reports more total
+/// records than were returned, write a single-line stderr note pointing at
+/// the silent truncation. Suppressed by `--quiet`. Single-record shapes
+/// (`SingleFlat`/`SingleNested`) and unpaginated lists never trigger it.
+fn maybe_emit_truncation_note(
+    ctx: &crate::runtime::ApiContext,
+    renderable: &crate::output::Renderable,
+) {
+    if ctx.quiet || ctx.limit.is_some() {
+        return;
+    }
+    if renderable.shape != crate::output::Shape::List || !renderable.paginated {
+        return;
+    }
+    let (Some(total), Some(limit)) = (renderable.total, renderable.limit) else {
+        return;
+    };
+    if total <= limit as u64 {
+        return;
+    }
+    let _ = writeln!(
+        std::io::stderr(),
+        "note: showing {limit} of {total} records — pass --limit to see more"
+    );
 }

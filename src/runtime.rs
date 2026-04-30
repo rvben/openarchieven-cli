@@ -204,17 +204,7 @@ mod tests {
     use std::time::Duration;
 
     fn args() -> GlobalApiArgs {
-        GlobalApiArgs {
-            timeout: None,
-            no_cache: false,
-            refresh: false,
-            cache_ttl: None,
-            cache_dir: None,
-            fields: None,
-            limit: None,
-            offset: None,
-            lang: None,
-        }
+        GlobalApiArgs::default()
     }
 
     #[test]

@@ -1496,6 +1496,101 @@ fn global_flag_propagates_through_nested_stats_subcommand() {
     assert_eq!(v["items"][0]["archive_code"], "elo");
 }
 
+// ---------------------------------------------------------------------------
+// Default-limit truncation must be visible: when the user did not pass
+// --limit and the response is paginated with more records than the default,
+// emit a stderr note so silent under-fetching is impossible. Quiet mode and
+// explicit --limit suppress it.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn default_limit_truncation_emits_stderr_note() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "10"), ("start", "0")],
+        json!({"response": {"numFound": 1234, "docs": (0..10)
+            .map(|i| json!({"id": format!("b-{i}")}))
+            .collect::<Vec<_>>()}}),
+    );
+    let out = env.cmd().args(["births", "jansen"]).output().unwrap();
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("note: showing 10 of 1234 records"),
+        "expected truncation note on stderr, got: {stderr:?}"
+    );
+    assert!(
+        stderr.contains("--limit"),
+        "note must reference --limit: {stderr:?}"
+    );
+}
+
+#[test]
+fn explicit_limit_suppresses_truncation_note() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "10"), ("start", "0")],
+        json!({"response": {"numFound": 1234, "docs": (0..10)
+            .map(|i| json!({"id": format!("b-{i}")}))
+            .collect::<Vec<_>>()}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--limit", "10", "births", "jansen"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("note:"),
+        "explicit --limit must suppress note, got: {stderr:?}"
+    );
+}
+
+#[test]
+fn quiet_suppresses_truncation_note() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "10"), ("start", "0")],
+        json!({"response": {"numFound": 1234, "docs": (0..10)
+            .map(|i| json!({"id": format!("b-{i}")}))
+            .collect::<Vec<_>>()}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--quiet", "births", "jansen"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("note:"),
+        "--quiet must suppress note, got: {stderr:?}"
+    );
+}
+
+#[test]
+fn no_truncation_means_no_note() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "10"), ("start", "0")],
+        json!({"response": {"numFound": 3, "docs": (0..3)
+            .map(|i| json!({"id": format!("b-{i}")}))
+            .collect::<Vec<_>>()}}),
+    );
+    let out = env.cmd().args(["births", "jansen"]).output().unwrap();
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("note:"),
+        "total <= limit must not trigger note, got: {stderr:?}"
+    );
+}
+
 #[test]
 fn fields_flag_works_before_subcommand() {
     let env = Env::new();

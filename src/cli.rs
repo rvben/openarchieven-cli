@@ -118,8 +118,10 @@ pub enum CacheCmd {
 
 /// Cross-cutting API flags. Flattened into `Cli` and propagated to every
 /// subcommand via `global = true`, so each flag may appear before OR after
-/// the subcommand name on the command line.
-#[derive(Debug, clap::Args)]
+/// the subcommand name on the command line. `Default::default()` produces
+/// the "no flags passed" state, used as a building block in tests.
+#[derive(Debug, Default, clap::Args)]
+#[command(next_help_heading = "API options")]
 pub struct GlobalApiArgs {
     /// Per-request timeout (humantime: `30s`, `1m`, `500ms`).
     #[arg(global = true, long, value_parser = humantime::parse_duration)]
