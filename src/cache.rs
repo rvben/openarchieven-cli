@@ -624,6 +624,55 @@ mod store_tests {
         let err = Cache::open(link, false).unwrap_err();
         assert_eq!(err.kind, ErrorKind::Validation);
     }
+
+    #[test]
+    fn creates_non_existent_root_directory() {
+        let dir = td();
+        let new_root = dir.path().join("new_cache_dir");
+        assert!(!new_root.exists());
+        let cache = Cache::open(new_root.clone(), false).unwrap();
+        assert!(cache.root().exists());
+    }
+
+    #[test]
+    fn root_and_disabled_accessors() {
+        let dir = td();
+        let cache = Cache::open(dir.path().to_path_buf(), true).unwrap();
+        assert!(cache.disabled());
+        // root() returns the path (not canonicalized for disabled)
+        let _ = cache.root();
+    }
+
+    #[test]
+    fn disabled_cache_open_does_not_create_dir() {
+        let dir = td();
+        let new_root = dir.path().join("should_not_exist");
+        let cache = Cache::open(new_root.clone(), true).unwrap();
+        assert!(cache.disabled());
+        // Disabled cache should not have created the directory
+        assert!(!new_root.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn put_into_read_only_dir_logs_and_does_not_panic() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = td();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        // Make the cache dir read-only so tempfile creation fails.
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o500)).unwrap();
+        let now = Utc::now();
+        let e = Entry {
+            url: "u".into(),
+            fetched_at: now,
+            expires_at: None,
+            body: serde_json::json!({}),
+        };
+        // put() must not panic or propagate the error.
+        cache.put("abc", &e);
+        // Restore permissions so TempDir cleanup can succeed.
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    }
 }
 
 #[cfg(test)]
@@ -721,5 +770,143 @@ mod ops_tests {
         assert!(!is_entry_filename(".lock"));
         assert!(!is_entry_filename("hello.json"));
         assert!(!is_entry_filename(&format!("{}.json", "Z".repeat(64))));
+    }
+
+    #[test]
+    fn info_returns_zero_when_root_does_not_exist() {
+        let dir = tempfile::tempdir().unwrap();
+        let nonexistent = dir.path().join("no_such_dir");
+        // Build the cache in disabled mode so open() won't create the dir.
+        let cache = Cache {
+            root: nonexistent,
+            disabled: false,
+        };
+        let info = cache.info().unwrap();
+        assert_eq!(info.entries, 0);
+        assert_eq!(info.bytes, 0);
+        assert!(info.oldest.is_none());
+        assert!(info.newest.is_none());
+    }
+
+    #[test]
+    fn info_skips_non_file_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        // Create a subdirectory inside the cache root; its name does not match
+        // the entry filename pattern, so info() should skip it.
+        let subdir = dir.path().join(format!("{}.json", "d".repeat(64)));
+        std::fs::create_dir(&subdir).unwrap();
+        let info = cache.info().unwrap();
+        assert_eq!(info.entries, 0);
+    }
+
+    #[test]
+    fn info_skips_unreadable_json_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        // Write a valid entry filename but with garbage content.
+        let path = dir.path().join(format!("{}.json", "e".repeat(64)));
+        std::fs::write(&path, b"not valid json").unwrap();
+        // info() should count the file (bytes/entries) but skip oldest/newest.
+        let info = cache.info().unwrap();
+        assert_eq!(info.entries, 1);
+        assert!(info.oldest.is_none());
+        assert!(info.newest.is_none());
+    }
+
+    #[test]
+    fn clear_skips_non_file_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        // A directory whose name looks like a cache entry should be skipped.
+        let fake_entry_dir = dir.path().join(format!("{}.json", "f".repeat(64)));
+        std::fs::create_dir(&fake_entry_dir).unwrap();
+        let n = cache.clear().unwrap();
+        assert_eq!(n, 0);
+        assert!(fake_entry_dir.exists());
+    }
+
+    #[test]
+    fn prune_skips_non_file_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let fake_entry_dir = dir.path().join(format!("{}.json", "a".repeat(64)));
+        std::fs::create_dir(&fake_entry_dir).unwrap();
+        let n = cache.prune(Utc::now()).unwrap();
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn prune_keeps_never_expiring_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let now = Utc::now();
+        let entry = Entry {
+            url: "u".into(),
+            fetched_at: now,
+            expires_at: None, // Never expires
+            body: serde_json::json!({}),
+        };
+        cache.put("a".repeat(64).as_str(), &entry);
+        let far_future = now + chrono::Duration::days(365 * 100);
+        let n = cache.prune(far_future).unwrap();
+        assert_eq!(n, 0);
+        assert_eq!(cache.info().unwrap().entries, 1);
+    }
+
+    #[test]
+    fn clear_with_empty_cache_returns_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let n = cache.clear().unwrap();
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn prune_on_empty_cache_returns_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        let n = cache.prune(Utc::now()).unwrap();
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn with_exclusive_lock_retry_then_succeeds() {
+        // Hold the advisory lock from a background thread long enough for
+        // with_exclusive_lock to retry (WouldBlock path), then release it.
+        use fs4::fs_std::FileExt;
+        use std::sync::{Arc, Barrier};
+
+        let dir = tempfile::tempdir().unwrap();
+        let lock_path = dir.path().join(LOCK_FILENAME);
+
+        // Create the lock file upfront.
+        let holder = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .unwrap();
+        holder.lock_exclusive().unwrap();
+
+        let barrier = Arc::new(Barrier::new(2));
+        let barrier2 = barrier.clone();
+
+        let release_after_ms = 300u64;
+        let holder_thread = std::thread::spawn(move || {
+            barrier2.wait(); // signal that lock is held
+            std::thread::sleep(Duration::from_millis(release_after_ms));
+            holder.unlock().unwrap();
+        });
+
+        barrier.wait(); // wait until the holder has the lock
+
+        let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+        // clear() will call with_exclusive_lock, which will WouldBlock briefly.
+        let n = cache.clear().unwrap();
+        assert_eq!(n, 0);
+
+        holder_thread.join().unwrap();
     }
 }

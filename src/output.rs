@@ -350,6 +350,31 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    // ── Shape::as_str ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn shape_as_str_returns_stable_strings() {
+        assert_eq!(Shape::List.as_str(), "list");
+        assert_eq!(Shape::SingleFlat.as_str(), "single-flat");
+        assert_eq!(Shape::SingleNested.as_str(), "single-nested");
+    }
+
+    // ── Renderable constructors / with_total ──────────────────────────────────
+
+    #[test]
+    fn with_total_sets_total_field() {
+        let r = Renderable::list(json!([]), false, None, None).with_total(Some(42));
+        assert_eq!(r.total, Some(42));
+    }
+
+    #[test]
+    fn with_total_none_leaves_total_as_none() {
+        let r = Renderable::list(json!([]), false, None, None).with_total(None);
+        assert_eq!(r.total, None);
+    }
+
+    // ── list_envelope ─────────────────────────────────────────────────────────
+
     #[test]
     fn list_envelope_includes_pagination_metadata() {
         let r = Renderable::list(json!([{"a": 1}, {"a": 2}]), true, Some(10), Some(0));
@@ -369,6 +394,8 @@ mod tests {
         assert_eq!(v["paginated"], false);
         assert!(v["limit"].is_null());
     }
+
+    // ── apply_fields ──────────────────────────────────────────────────────────
 
     #[test]
     fn fields_filter_keeps_only_named_keys() {
@@ -396,6 +423,41 @@ mod tests {
         assert_eq!(err.kind, ErrorKind::Validation);
         assert!(err.message.contains("nested"));
     }
+
+    #[test]
+    fn fields_filter_on_single_flat_keeps_named_keys() {
+        let r = Renderable::single_flat(json!({"a": 1, "b": 2}));
+        let r = apply_fields(r, &["a".into()], &["a", "b"]).unwrap();
+        let obj = r.body.as_object().unwrap();
+        assert!(obj.contains_key("a"));
+        assert!(!obj.contains_key("b"));
+    }
+
+    #[test]
+    fn fields_filter_list_non_object_items_pass_through_unchanged() {
+        // When list items are not objects the filter just clones them.
+        let r = Renderable::list(json!(["hello", "world"]), false, None, None);
+        let r = apply_fields(r, &[], &["anything"]).unwrap();
+        let items = r.body.as_array().unwrap();
+        assert_eq!(items[0], json!("hello"));
+    }
+
+    #[test]
+    fn fields_filter_passthrough_for_non_array_non_object_body() {
+        // A list whose body is not an array falls into the `_ => r.body.clone()` arm.
+        let r = Renderable {
+            shape: Shape::List,
+            body: json!(42),
+            paginated: false,
+            limit: None,
+            offset: None,
+            total: None,
+        };
+        let r = apply_fields(r, &[], &["x"]).unwrap();
+        assert_eq!(r.body, json!(42));
+    }
+
+    // ── apply_fields_auto ─────────────────────────────────────────────────────
 
     #[test]
     fn fields_auto_derives_known_set_from_list_items() {
@@ -445,6 +507,23 @@ mod tests {
     }
 
     #[test]
+    fn fields_auto_passthrough_for_non_array_list_body() {
+        // Body that is not an array falls into `_ => return Ok(r)`.
+        let r = Renderable {
+            shape: Shape::List,
+            body: json!(null),
+            paginated: false,
+            limit: None,
+            offset: None,
+            total: None,
+        };
+        let r = apply_fields_auto(r, &["x".into()]).unwrap();
+        assert_eq!(r.body, json!(null));
+    }
+
+    // ── JSON renderer ─────────────────────────────────────────────────────────
+
+    #[test]
     fn json_render_list_writes_envelope() {
         let r = Renderable::list(json!([{"x": 1}]), true, Some(5), Some(0));
         let mut buf = Vec::new();
@@ -453,6 +532,25 @@ mod tests {
         let v: Value = serde_json::from_str(s.trim()).unwrap();
         assert_eq!(v["items"][0]["x"], 1);
         assert_eq!(v["paginated"], true);
+    }
+
+    #[test]
+    fn json_render_list_pretty() {
+        let r = Renderable::list(json!([{"x": 1}]), false, None, None);
+        let mut buf_pretty = Vec::new();
+        render(&mut buf_pretty, &r, Format::Json, true).unwrap();
+        let pretty = String::from_utf8(buf_pretty).unwrap();
+        let mut buf_compact = Vec::new();
+        render(&mut buf_compact, &r, Format::Json, false).unwrap();
+        let compact = String::from_utf8(buf_compact).unwrap();
+
+        assert!(pretty.contains("\n  \"items\": ["));
+        assert!(pretty.contains("\n      \"x\": 1"));
+        assert!(!compact.contains("\n  "));
+        assert!(pretty.len() > compact.len());
+
+        let v: Value = serde_json::from_str(pretty.trim()).unwrap();
+        assert_eq!(v["items"][0]["x"], 1);
     }
 
     #[test]
@@ -466,6 +564,159 @@ mod tests {
     }
 
     #[test]
+    fn json_render_single_nested_pretty() {
+        let r = Renderable::single_nested(json!({"a": {"b": 2}}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Json, true).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        // Outer object indent = 2, nested object indent = 4.
+        assert_eq!(s.trim_end(), "{\n  \"a\": {\n    \"b\": 2\n  }\n}");
+        assert!(s.ends_with('\n'));
+    }
+
+    #[test]
+    fn json_render_single_flat_pretty() {
+        let r = Renderable::single_flat(json!({"foo": "bar"}));
+        let mut buf_pretty = Vec::new();
+        render(&mut buf_pretty, &r, Format::Json, true).unwrap();
+        let pretty = String::from_utf8(buf_pretty).unwrap();
+        let mut buf_compact = Vec::new();
+        render(&mut buf_compact, &r, Format::Json, false).unwrap();
+        let compact = String::from_utf8(buf_compact).unwrap();
+
+        assert_eq!(pretty.trim_end(), "{\n  \"foo\": \"bar\"\n}");
+        assert_eq!(compact.trim_end(), "{\"foo\":\"bar\"}");
+    }
+
+    // ── Table renderer ────────────────────────────────────────────────────────
+
+    #[test]
+    fn table_render_empty_list_prints_no_results() {
+        let r = Renderable::list(json!([]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("(no results)"));
+    }
+
+    #[test]
+    fn table_render_list_with_objects() {
+        let r = Renderable::list(json!([{"name": "alice", "age": 30}]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("name"));
+        assert!(s.contains("alice"));
+        assert!(s.contains("age"));
+        assert!(s.contains("30"));
+    }
+
+    #[test]
+    fn table_render_list_null_item_shows_empty_row() {
+        let r = Renderable::list(json!([null, null]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        let rows: Vec<&str> = s.lines().filter(|l| l.starts_with('│')).collect();
+        // Header row + two empty data rows.
+        assert_eq!(rows.len(), 3);
+        assert!(rows[0].contains("value"));
+        for row in &rows[1..] {
+            let cell = row.trim_matches('│').trim();
+            assert!(cell.is_empty(), "expected empty cell, got {row:?}");
+        }
+    }
+
+    #[test]
+    fn table_render_list_scalar_item() {
+        let r = Renderable::list(json!([42, 99]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        let data_rows: Vec<&str> = s
+            .lines()
+            .filter(|l| l.starts_with('│') && !l.contains("value"))
+            .collect();
+        assert_eq!(data_rows.len(), 2);
+        assert!(data_rows[0].contains("42"));
+        assert!(data_rows[1].contains("99"));
+    }
+
+    #[test]
+    fn table_render_list_object_with_nested_value_serialized() {
+        let r = Renderable::list(json!([{"meta": {"x": 1}}]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        // Nested object must be serialized as compact JSON, not Debug-formatted.
+        assert!(
+            s.contains(r#"{"x":1}"#),
+            "expected serialized JSON in cell, got:\n{s}"
+        );
+    }
+
+    #[test]
+    fn table_render_list_missing_key_renders_null() {
+        // The renderer fills missing keys with `Value::Null`, whose `to_string()` is "null".
+        let r = Renderable::list(json!([{"a": 1, "b": 2}, {"a": 3}]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        // The second row has only `a=3`; `b` is rendered as the literal "null".
+        let second_row = s
+            .lines()
+            .find(|l| l.starts_with('│') && l.contains(" 3 "))
+            .expect("second data row present");
+        assert!(
+            second_row.contains("null"),
+            "expected 'null' in row, got: {second_row:?}"
+        );
+    }
+
+    #[test]
+    fn table_render_single_flat() {
+        let r = Renderable::single_flat(json!({"city": "Amsterdam", "pop": 900000}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("key"));
+        assert!(s.contains("value"));
+        assert!(s.contains("city"));
+        assert!(s.contains("Amsterdam"));
+    }
+
+    #[test]
+    fn table_render_single_nested_with_object_value_serialized() {
+        let r = Renderable::single_nested(json!({"addr": {"city": "AMS"}}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        // Nested object rendered as compact JSON in the value column.
+        assert!(s.contains(r#"{"city":"AMS"}"#), "got:\n{s}");
+    }
+
+    #[test]
+    fn table_render_single_nested_with_array_value_serialized() {
+        let r = Renderable::single_nested(json!({"tags": ["a", "b"]}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains(r#"["a","b"]"#), "got:\n{s}");
+    }
+
+    #[test]
+    fn table_render_single_flat_scalar_values() {
+        let r = Renderable::single_flat(json!({"count": 42, "active": true}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Table, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("42"));
+        assert!(s.contains("true"));
+    }
+
+    // ── Markdown renderer ─────────────────────────────────────────────────────
+
+    #[test]
     fn markdown_renders_list_table() {
         let r = Renderable::list(json!([{"a": 1, "b": "x"}]), false, None, None);
         let mut buf = Vec::new();
@@ -473,6 +724,37 @@ mod tests {
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("| a | b |"));
         assert!(s.contains("| --- | --- |"));
+    }
+
+    #[test]
+    fn markdown_renders_empty_list() {
+        let r = Renderable::list(json!([]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("_(no results)_"));
+    }
+
+    #[test]
+    fn markdown_renders_list_non_object_items() {
+        let r = Renderable::list(json!(["hello", "world"]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("| value |"));
+        assert!(s.contains("hello"));
+    }
+
+    #[test]
+    fn markdown_renders_list_null_cells_as_empty() {
+        let r = Renderable::list(json!([{"a": 1, "b": null}]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        let lines: Vec<&str> = s.lines().collect();
+        assert_eq!(lines[0], "| a | b |");
+        assert_eq!(lines[1], "| --- | --- |");
+        assert_eq!(lines[2], "| 1 |  |");
     }
 
     #[test]
@@ -485,6 +767,34 @@ mod tests {
     }
 
     #[test]
+    fn markdown_replaces_newlines_in_cells() {
+        let r = Renderable::list(json!([{"text": "line1\nline2"}]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("line1 line2"));
+    }
+
+    #[test]
+    fn markdown_renders_single_flat() {
+        let r = Renderable::single_flat(json!({"name": "alice", "age": 30}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("- **name**: alice"));
+        assert!(s.contains("- **age**: 30"));
+    }
+
+    #[test]
+    fn markdown_renders_single_flat_null_value_as_empty() {
+        let r = Renderable::single_flat(json!({"key": null}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("- **key**: "));
+    }
+
+    #[test]
     fn markdown_renders_nested_as_fenced_json() {
         let r = Renderable::single_nested(json!({"name": "alice", "addr": {"city": "AMS"}}));
         let mut buf = Vec::new();
@@ -493,5 +803,67 @@ mod tests {
         assert!(s.contains("- **name**: alice"));
         assert!(s.contains("- **addr**:"));
         assert!(s.contains("```json"));
+    }
+
+    #[test]
+    fn markdown_renders_nested_array_as_fenced_json() {
+        let r = Renderable::single_nested(json!({"tags": ["a", "b"]}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("- **tags**:"));
+        assert!(s.contains("```json"));
+        assert!(s.contains("\"a\""));
+    }
+
+    #[test]
+    fn markdown_renders_nested_scalar() {
+        let r = Renderable::single_nested(json!({"count": 7}));
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("- **count**: 7"));
+    }
+
+    #[test]
+    fn markdown_object_cell_escapes_pipes_in_serialized_json() {
+        let r = Renderable::list(json!([{"meta": {"key": "a|b"}}]), false, None, None);
+        let mut buf = Vec::new();
+        render(&mut buf, &r, Format::Markdown, false).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        let lines: Vec<&str> = s.lines().collect();
+        // Header, separator, single data row.
+        assert_eq!(lines[0], "| meta |");
+        assert_eq!(lines[1], "| --- |");
+        // The serialized object cell has the inner `|` escaped as `\|`.
+        assert_eq!(lines[2], r#"| {"key":"a\|b"} |"#);
+    }
+
+    // ── truncate ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn truncate_short_string_unchanged() {
+        assert_eq!(truncate("hello", 10), "hello");
+    }
+
+    #[test]
+    fn truncate_exact_length_unchanged() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_long_string_appends_ellipsis() {
+        let result = truncate("abcdef", 5);
+        assert!(result.ends_with('…'));
+        assert_eq!(result.chars().count(), 5);
+    }
+
+    #[test]
+    fn truncate_multibyte_chars_counted_correctly() {
+        // Unicode characters should be counted by char not byte.
+        let s: String = "αβγδε".to_string(); // 5 chars, 10 bytes
+        assert_eq!(truncate(&s, 5), "αβγδε");
+        let result = truncate(&s, 4);
+        assert!(result.ends_with('…'));
     }
 }
