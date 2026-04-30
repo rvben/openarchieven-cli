@@ -32,6 +32,9 @@ pub struct Cli {
     #[arg(global = true, long)]
     pub no_color: bool,
 
+    #[command(flatten)]
+    pub api: GlobalApiArgs,
+
     #[command(subcommand)]
     pub command: Cmd,
 }
@@ -113,44 +116,45 @@ pub enum CacheCmd {
     Prune,
 }
 
-/// Per-command flags shared by every endpoint subcommand. Flatten into each
-/// subcommand's typed `Args` struct via `#[command(flatten)]`.
+/// Cross-cutting API flags. Flattened into `Cli` and propagated to every
+/// subcommand via `global = true`, so each flag may appear before OR after
+/// the subcommand name on the command line.
 #[derive(Debug, clap::Args)]
 pub struct GlobalApiArgs {
     /// Per-request timeout (humantime: `30s`, `1m`, `500ms`).
-    #[arg(long, value_parser = humantime::parse_duration)]
+    #[arg(global = true, long, value_parser = humantime::parse_duration)]
     pub timeout: Option<Duration>,
 
     /// Bypass cache read AND write for this invocation.
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub no_cache: bool,
 
     /// Bypass cache read; still write.
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub refresh: bool,
 
     /// Override cache TTL for this invocation. `inf` = never expire.
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub cache_ttl: Option<String>,
 
     /// Override cache directory.
-    #[arg(long, env = "OPENARCHIEVEN_CACHE_DIR")]
+    #[arg(global = true, long, env = "OPENARCHIEVEN_CACHE_DIR")]
     pub cache_dir: Option<PathBuf>,
 
     /// Top-level field projection (comma-separated).
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub fields: Option<String>,
 
     /// Pagination limit (where supported).
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub limit: Option<u32>,
 
     /// Pagination offset (where supported).
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub offset: Option<u32>,
 
     /// Response language.
-    #[arg(long)]
+    #[arg(global = true, long)]
     pub lang: Option<String>,
 }
 
@@ -163,8 +167,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = YEARSAGO_EXAMPLES)]
 pub struct YearsagoArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Number of years ago.
     pub years: u32,
 }
@@ -175,10 +177,7 @@ Examples:
   openarchieven archives
   openarchieven -o json archives | jq '.items[] | .archive_code' | head
 ")]
-pub struct ArchivesArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
-}
+pub struct ArchivesArgs {}
 
 const CENSUS_EXAMPLES: &str = "\
 Examples:
@@ -189,8 +188,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = CENSUS_EXAMPLES)]
 pub struct CensusArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Year (YYYY).
     #[arg(long)]
     pub year: i32,
@@ -220,8 +217,6 @@ fn parse_decimal_str(s: &str) -> Result<String, String> {
 #[derive(Debug, clap::Args)]
 #[command(after_help = WEATHER_EXAMPLES)]
 pub struct WeatherArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Date as YYYY-MM-DD.
     #[arg(long)]
     pub date: String,
@@ -242,8 +237,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = SHOW_EXAMPLES)]
 pub struct ShowArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Archive code (e.g. `srt`, `elo`, `saa`). List with `openarchieven archives`.
     pub archive: String,
     /// Record identifier within that archive.
@@ -259,8 +252,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = MATCH_EXAMPLES)]
 pub struct MatchArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Person name to match.
     pub name: String,
     /// Birth year (YYYY).
@@ -286,8 +277,6 @@ fn parse_sort_arg(s: &str) -> Result<i32, String> {
 #[derive(Debug, clap::Args)]
 #[command(after_help = SEARCH_EXAMPLES)]
 pub struct SearchArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Free-text query (typically a person name).
     pub name: String,
     /// Filter by archive code.
@@ -323,9 +312,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = BIRTHS_EXAMPLES)]
 pub struct BirthsArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
-
     /// Person name to search for (given name and/or family name).
     pub name: String,
 
@@ -351,8 +337,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = DEATHS_EXAMPLES)]
 pub struct DeathsArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Deceased's name.
     pub name: String,
     /// Filter by year of death (YYYY).
@@ -372,8 +356,6 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = MARRIAGES_EXAMPLES)]
 pub struct MarriagesArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// First partner's name.
     pub name1: String,
     /// Second partner's name.
@@ -413,8 +395,6 @@ Examples:
 
 #[derive(Debug, clap::Args)]
 pub struct StatsArchiveArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     /// Optional archive code filter.
     #[arg(long)]
     pub archive: Option<String>,
@@ -441,8 +421,6 @@ fn parse_event_type(s: &str) -> std::result::Result<i32, String> {
 
 #[derive(Debug, clap::Args)]
 pub struct StatsFamilynamesArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     #[arg(long)]
     pub place: Option<String>,
     #[arg(long)]
@@ -462,8 +440,6 @@ Examples:
 
 #[derive(Debug, clap::Args)]
 pub struct StatsFirstnamesArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     #[arg(long)]
     pub place: String,
     #[arg(long)]
@@ -478,8 +454,6 @@ Examples:
 
 #[derive(Debug, clap::Args)]
 pub struct StatsProfessionsArgs {
-    #[command(flatten)]
-    pub global: GlobalApiArgs,
     #[arg(long)]
     pub place: Option<String>,
     #[arg(long)]

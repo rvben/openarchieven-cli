@@ -72,7 +72,8 @@ fn write_stdout(
 
 fn dispatch(cli: Cli) -> Result<(), Error> {
     let global = crate::runtime::GlobalArgs::from_cli(&cli);
-    match cli.command {
+    let Cli { api, command, .. } = cli;
+    match command {
         Cmd::Version => {
             let body = serde_json::json!({ "version": env!("CARGO_PKG_VERSION") });
             let renderable = crate::output::Renderable::single_flat(body);
@@ -84,15 +85,11 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let json = serde_json::to_string_pretty(&schema).expect("schema always serializes");
             write_stdout(|out| writeln!(out, "{json}"))
         }
-        Cmd::Archives(args) => {
-            let crate::cli::ArchivesArgs { global: global_api } = args;
-            run_typed_endpoint(global_api, &global, |client, cache, ctx| {
-                crate::commands::archives::run(client, cache, ctx)
-            })
-        }
+        Cmd::Archives(_args) => run_typed_endpoint(api, &global, |client, cache, ctx| {
+            crate::commands::archives::run(client, cache, ctx)
+        }),
         Cmd::Search(args) => {
             let crate::cli::SearchArgs {
-                global: global_api,
                 name,
                 archive,
                 source_type,
@@ -102,7 +99,7 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 country,
                 sort,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::search::Args {
                     name,
                     archive,
@@ -118,11 +115,10 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
         }
         Cmd::Show(args) => {
             let crate::cli::ShowArgs {
-                global: global_api,
                 archive,
                 identifier,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::show::Args {
                     archive,
                     identifier,
@@ -131,25 +127,20 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             })
         }
         Cmd::MatchCmd(args) => {
-            let crate::cli::MatchArgs {
-                global: global_api,
-                name,
-                birthyear,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::MatchArgs { name, birthyear } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::match_record::Args { name, birthyear };
                 crate::commands::match_record::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Births(args) => {
             let crate::cli::BirthsArgs {
-                global: global_api,
                 name,
                 event_year,
                 event_place,
                 event_province,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::births::Args {
                     name,
                     flags: crate::commands::event_records::CommonFlags {
@@ -163,12 +154,11 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
         }
         Cmd::Deaths(args) => {
             let crate::cli::DeathsArgs {
-                global: global_api,
                 name,
                 event_year,
                 event_place,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::deaths::Args {
                     name,
                     flags: crate::commands::event_records::CommonFlags {
@@ -182,13 +172,12 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
         }
         Cmd::Marriages(args) => {
             let crate::cli::MarriagesArgs {
-                global: global_api,
                 name1,
                 name2,
                 event_year,
                 event_place,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::marriages::Args {
                     name1,
                     name2,
@@ -202,25 +191,21 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             })
         }
         Cmd::Yearsago(args) => {
-            let crate::cli::YearsagoArgs {
-                global: global_api,
-                years,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::YearsagoArgs { years } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::yearsago::Args { years };
                 crate::commands::yearsago::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Census(args) => {
             let crate::cli::CensusArgs {
-                global: global_api,
                 year,
                 place,
                 gg_uri,
                 province,
                 richness,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::census::Args {
                     year,
                     place,
@@ -233,12 +218,11 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
         }
         Cmd::Weather(args) => {
             let crate::cli::WeatherArgs {
-                global: global_api,
                 date,
                 latitude,
                 longitude,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::weather::Args {
                     date,
                     latitude,
@@ -248,54 +232,41 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             })
         }
         Cmd::Stats(StatsCmd::Records(args)) => {
-            let crate::cli::StatsArchiveArgs {
-                global: global_api,
-                archive,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::StatsArchiveArgs { archive } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::archive_stat::ArchiveStatArgs { archive };
                 crate::commands::stats::records::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Sources(args)) => {
-            let crate::cli::StatsArchiveArgs {
-                global: global_api,
-                archive,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::StatsArchiveArgs { archive } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::archive_stat::ArchiveStatArgs { archive };
                 crate::commands::stats::sources::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Events(args)) => {
-            let crate::cli::StatsArchiveArgs {
-                global: global_api,
-                archive,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::StatsArchiveArgs { archive } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::archive_stat::ArchiveStatArgs { archive };
                 crate::commands::stats::events::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Comments(args)) => {
-            let crate::cli::StatsArchiveArgs {
-                global: global_api,
-                archive,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::StatsArchiveArgs { archive } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::archive_stat::ArchiveStatArgs { archive };
                 crate::commands::stats::comments::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Familynames(args)) => {
             let crate::cli::StatsFamilynamesArgs {
-                global: global_api,
                 place,
                 year_start,
                 year_end,
                 event_type,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::familynames::Args {
                     place,
                     year_start,
@@ -306,24 +277,19 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             })
         }
         Cmd::Stats(StatsCmd::Firstnames(args)) => {
-            let crate::cli::StatsFirstnamesArgs {
-                global: global_api,
-                place,
-                year,
-            } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            let crate::cli::StatsFirstnamesArgs { place, year } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::firstnames::Args { place, year };
                 crate::commands::stats::firstnames::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Professions(args)) => {
             let crate::cli::StatsProfessionsArgs {
-                global: global_api,
                 place,
                 year_start,
                 year_end,
             } = args;
-            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
                 let typed = crate::commands::stats::professions::Args {
                     place,
                     year_start,

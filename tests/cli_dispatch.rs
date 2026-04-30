@@ -1424,3 +1424,77 @@ fn archives_help_shows_real_args_and_examples() {
         "stale REST placeholder visible: {s}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// API flags (--limit, --no-cache, etc.) are global: they parse identically
+// whether placed before OR after the subcommand. Pin both placements.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn limit_flag_works_before_subcommand() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "5"), ("start", "0")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "b-1"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--limit", "5", "births", "jansen"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "b-1");
+}
+
+#[test]
+fn limit_flag_works_after_subcommand() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/getBirths.json",
+        &[("name", "jansen"), ("number_show", "5"), ("start", "0")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "b-1"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["births", "jansen", "--limit", "5"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "b-1");
+}
+
+#[test]
+fn no_cache_flag_works_before_subcommand() {
+    let env = Env::new();
+    env.mount_get(
+        "/stats/archives.json",
+        json!({"archives": [{"archive_code": "elo", "name": "Eindhoven"}]}),
+    );
+    let out = env
+        .cmd()
+        .args(["--no-cache", "archives"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["archive_code"], "elo");
+}
+
+#[test]
+fn fields_flag_works_before_subcommand() {
+    let env = Env::new();
+    env.mount_get_with_params(
+        "/records/search.json",
+        &[("name", "jansen")],
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1", "name": "Jan"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--fields", "id", "search", "jansen"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    let item = v["items"][0].as_object().unwrap();
+    assert_eq!(item.len(), 1);
+    assert_eq!(item["id"], "r-1");
+}

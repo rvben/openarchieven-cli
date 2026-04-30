@@ -412,6 +412,7 @@ mod tests {
             output: None,
             quiet: false,
             no_color: false,
+            api: args(),
             command: Cmd::Version,
         };
         let ga = GlobalArgs::from_cli(&cli);
@@ -426,6 +427,7 @@ mod tests {
             output: Some(FormatArg::Json),
             quiet: false,
             no_color: false,
+            api: args(),
             command: Cmd::Version,
         };
         let ga = GlobalArgs::from_cli(&cli);
@@ -439,6 +441,7 @@ mod tests {
             output: Some(FormatArg::Table),
             quiet: true,
             no_color: true,
+            api: args(),
             command: Cmd::Version,
         };
         let ga = GlobalArgs::from_cli(&cli);
@@ -454,6 +457,7 @@ mod tests {
             output: Some(FormatArg::Markdown),
             quiet: false,
             no_color: false,
+            api: args(),
             command: Cmd::Version,
         };
         let ga = GlobalArgs::from_cli(&cli);
