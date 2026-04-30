@@ -78,19 +78,23 @@ pub enum Cmd {
 #[derive(Debug, Subcommand)]
 pub enum StatsCmd {
     /// Aggregate record counts by archive.
-    Records(ApiArgs),
+    #[command(after_help = STATS_RECORDS_EXAMPLES)]
+    Records(StatsArchiveArgs),
     /// Aggregate source counts by archive.
-    Sources(ApiArgs),
+    #[command(after_help = STATS_SOURCES_EXAMPLES)]
+    Sources(StatsArchiveArgs),
     /// Aggregate event counts by archive.
-    Events(ApiArgs),
+    #[command(after_help = STATS_EVENTS_EXAMPLES)]
+    Events(StatsArchiveArgs),
     /// Aggregate comment counts by archive.
-    Comments(ApiArgs),
+    #[command(after_help = STATS_COMMENTS_EXAMPLES)]
+    Comments(StatsArchiveArgs),
     /// Family-name frequency stats.
-    Familynames(ApiArgs),
+    Familynames(StatsFamilynamesArgs),
     /// First-name frequency stats.
-    Firstnames(ApiArgs),
+    Firstnames(StatsFirstnamesArgs),
     /// Profession frequency stats.
-    Professions(ApiArgs),
+    Professions(StatsProfessionsArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -377,6 +381,99 @@ pub struct MarriagesArgs {
     /// Filter by place of marriage.
     #[arg(long)]
     pub event_place: Option<String>,
+}
+
+const STATS_RECORDS_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats records
+  openarchieven stats records --archive elo
+  openarchieven -o json stats records | jq 'sort_by(-.count) | .[0:5]'
+";
+
+const STATS_SOURCES_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats sources
+  openarchieven stats sources --archive elo
+";
+
+const STATS_EVENTS_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats events
+  openarchieven stats events --archive elo
+";
+
+const STATS_COMMENTS_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats comments
+  openarchieven stats comments --archive elo
+";
+
+#[derive(Debug, clap::Args)]
+pub struct StatsArchiveArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Optional archive code filter.
+    #[arg(long)]
+    pub archive: Option<String>,
+}
+
+const STATS_FAMILYNAMES_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats familynames --place Amsterdam --year-start 1849 --year-end 1855
+  openarchieven stats familynames --place Rotterdam --year-start 1900 --year-end 1910 --event-type 2
+  openarchieven -o json stats familynames --place Utrecht --year-start 1850 --year-end 1900 | jq '.items[0:10]'
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = STATS_FAMILYNAMES_EXAMPLES)]
+pub struct StatsFamilynamesArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    #[arg(long)]
+    pub place: Option<String>,
+    #[arg(long)]
+    pub year_start: Option<i32>,
+    #[arg(long)]
+    pub year_end: Option<i32>,
+    /// Event-type filter: 0 (all), 1 (birth), 2 (death), 3 (marriage), 6 (other).
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(["0","1","2","3","6"]))]
+    pub event_type: Option<String>,
+}
+
+const STATS_FIRSTNAMES_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats firstnames --place Amsterdam --year 1900
+  openarchieven stats firstnames --place Rotterdam --year 1850 --limit 50
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = STATS_FIRSTNAMES_EXAMPLES)]
+pub struct StatsFirstnamesArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    #[arg(long)]
+    pub place: String,
+    #[arg(long)]
+    pub year: i32,
+}
+
+const STATS_PROFESSIONS_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats professions --place Amsterdam --year-start 1850 --year-end 1900
+  openarchieven stats professions --place Rotterdam --year-start 1900 --year-end 1910 --limit 50
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = STATS_PROFESSIONS_EXAMPLES)]
+pub struct StatsProfessionsArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    #[arg(long)]
+    pub place: Option<String>,
+    #[arg(long)]
+    pub year_start: Option<i32>,
+    #[arg(long)]
+    pub year_end: Option<i32>,
 }
 
 /// Catch-all positional + flag holder for the `Stats` sub-subcommands.

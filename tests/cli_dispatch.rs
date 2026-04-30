@@ -1231,6 +1231,232 @@ fn census_help_shows_real_args_and_examples() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// stats subcommand --help: typed-Args migration asserts.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn stats_records_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "records", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--archive"), "help must show --archive: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        s.contains("sort_by"),
+        "Examples must include jq example: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
+fn stats_sources_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "sources", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--archive"), "help must show --archive: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
+fn stats_events_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "events", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--archive"), "help must show --archive: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
+fn stats_comments_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "comments", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--archive"), "help must show --archive: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
+fn stats_familynames_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "familynames", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--place"), "help must show --place: {s}");
+    assert!(
+        s.contains("--year-start"),
+        "help must show --year-start: {s}"
+    );
+    assert!(s.contains("--year-end"), "help must show --year-end: {s}");
+    assert!(
+        s.contains("--event-type"),
+        "help must show --event-type: {s}"
+    );
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        s.contains("Amsterdam"),
+        "Examples must include Amsterdam: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
+fn stats_familynames_rejects_unknown_event_type_at_parse() {
+    let dir = tempfile::tempdir().unwrap();
+    let assert = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .args(["stats", "familynames", "--event-type", "4"])
+        .assert()
+        .failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("--event-type"),
+        "expected --event-type in rejection: {stderr}"
+    );
+}
+
+#[test]
+fn stats_firstnames_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "firstnames", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--place"), "help must show --place: {s}");
+    assert!(s.contains("--year"), "help must show --year: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        s.contains("Amsterdam"),
+        "Examples must include Amsterdam: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
+fn stats_professions_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["stats", "professions", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--place"), "help must show --place: {s}");
+    assert!(
+        s.contains("--year-start"),
+        "help must show --year-start: {s}"
+    );
+    assert!(s.contains("--year-end"), "help must show --year-end: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        s.contains("Amsterdam"),
+        "Examples must include Amsterdam: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
 #[test]
 fn archives_help_shows_real_args_and_examples() {
     let dir = tempfile::tempdir().unwrap();

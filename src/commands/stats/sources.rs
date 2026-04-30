@@ -1,14 +1,10 @@
 use crate::cache::Cache;
 use crate::client::Client;
-use crate::commands::stats::archive_stat::{ArchiveStatArgs, parse_archive_rest, run_archive_stat};
+use crate::commands::stats::archive_stat::{ArchiveStatArgs, run_archive_stat};
 use crate::error::Result;
 use crate::output::Renderable;
 use crate::runtime::ApiContext;
 use crate::schema_cmd::{Arg, Command, OutputField};
-
-pub fn parse_rest(rest: &[String]) -> Result<ArchiveStatArgs> {
-    parse_archive_rest(rest, "sources")
-}
 
 pub fn run(
     client: &Client,

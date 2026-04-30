@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use clap::error::ErrorKind as ClapErrorKind;
 
-use openarchieven::cli::{ApiArgs, CacheCmd, Cli, Cmd, StatsCmd};
+use openarchieven::cli::{CacheCmd, Cli, Cmd, StatsCmd};
 use openarchieven::error::{Error, ErrorKind, emit_json};
 
 /// Returns `true` when `NO_COLOR` is set to a non-empty value.
@@ -250,45 +250,93 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             })
         }
         Cmd::Stats(StatsCmd::Records(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::records::parse_rest(rest)?;
-                openarchieven::commands::stats::records::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsArchiveArgs {
+                global: global_api,
+                archive,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed =
+                    openarchieven::commands::stats::archive_stat::ArchiveStatArgs { archive };
+                openarchieven::commands::stats::records::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Sources(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::sources::parse_rest(rest)?;
-                openarchieven::commands::stats::sources::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsArchiveArgs {
+                global: global_api,
+                archive,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed =
+                    openarchieven::commands::stats::archive_stat::ArchiveStatArgs { archive };
+                openarchieven::commands::stats::sources::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Events(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::events::parse_rest(rest)?;
-                openarchieven::commands::stats::events::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsArchiveArgs {
+                global: global_api,
+                archive,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed =
+                    openarchieven::commands::stats::archive_stat::ArchiveStatArgs { archive };
+                openarchieven::commands::stats::events::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Comments(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::comments::parse_rest(rest)?;
-                openarchieven::commands::stats::comments::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsArchiveArgs {
+                global: global_api,
+                archive,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed =
+                    openarchieven::commands::stats::archive_stat::ArchiveStatArgs { archive };
+                openarchieven::commands::stats::comments::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Familynames(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::familynames::parse_rest(rest)?;
-                openarchieven::commands::stats::familynames::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsFamilynamesArgs {
+                global: global_api,
+                place,
+                year_start,
+                year_end,
+                event_type,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::stats::familynames::Args {
+                    place,
+                    year_start,
+                    year_end,
+                    event_type: event_type
+                        .map(|s| s.parse::<i32>().expect("clap restricts to valid integers")),
+                };
+                openarchieven::commands::stats::familynames::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Firstnames(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::firstnames::parse_rest(rest)?;
-                openarchieven::commands::stats::firstnames::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsFirstnamesArgs {
+                global: global_api,
+                place,
+                year,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::stats::firstnames::Args { place, year };
+                openarchieven::commands::stats::firstnames::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Stats(StatsCmd::Professions(args)) => {
-            run_endpoint(args, &global, |client, cache, ctx, rest| {
-                let parsed = openarchieven::commands::stats::professions::parse_rest(rest)?;
-                openarchieven::commands::stats::professions::run(client, cache, ctx, &parsed)
+            let openarchieven::cli::StatsProfessionsArgs {
+                global: global_api,
+                place,
+                year_start,
+                year_end,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::stats::professions::Args {
+                    place,
+                    year_start,
+                    year_end,
+                };
+                openarchieven::commands::stats::professions::run(client, cache, ctx, &typed)
             })
         }
         Cmd::Cache(CacheCmd::Info) => run_cache_op(&global, |cache| {
@@ -318,31 +366,6 @@ where
         })?;
     let cache = openarchieven::cache::Cache::open(dir, false)?;
     let renderable = f(&cache)?;
-    let pretty = std::io::stdout().is_terminal();
-    write_stdout(|out| openarchieven::output::render(out, &renderable, global.format, pretty))
-}
-
-fn run_endpoint<F>(
-    args: ApiArgs,
-    global: &openarchieven::runtime::GlobalArgs,
-    f: F,
-) -> Result<(), Error>
-where
-    F: FnOnce(
-        &openarchieven::client::Client,
-        Option<&openarchieven::cache::Cache>,
-        &openarchieven::runtime::ApiContext,
-        &[String],
-    ) -> Result<openarchieven::output::Renderable, Error>,
-{
-    let ctx = openarchieven::runtime::ApiContext::from_args(&args)?;
-    let rest = args.rest;
-    let client = openarchieven::runtime::build_client(&ctx)?;
-    let cache = openarchieven::runtime::build_cache(&ctx)?;
-    let mut renderable = f(&client, cache.as_ref(), &ctx, &rest)?;
-    if let Some(fields) = ctx.fields.as_deref() {
-        renderable = openarchieven::output::apply_fields_auto(renderable, fields)?;
-    }
     let pretty = std::io::stdout().is_terminal();
     write_stdout(|out| openarchieven::output::render(out, &renderable, global.format, pretty))
 }
