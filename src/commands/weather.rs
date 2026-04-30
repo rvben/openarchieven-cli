@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::cache::Cache;
 use crate::client::{Client, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
@@ -47,7 +45,7 @@ pub fn run(
         ("latitude", args.latitude.as_str()),
         ("lang", ctx.lang.as_str()),
     ];
-    let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(30 * 24 * 3600)));
+    let ttl = resolve_ttl(ctx, TtlHint::Never);
     let body = client.get_cached("/related/weather.json", &params, ttl, cache)?;
 
     let items = match body {
@@ -98,8 +96,8 @@ pub fn schema() -> Command {
         mutating: false,
         response_shape: "list",
         paginated: false,
-        cache_ttl_seconds: Some(30 * 24 * 3600),
-        cache_ttl_strategy: "fixed",
+        cache_ttl_seconds: None,
+        cache_ttl_strategy: "never",
         args: vec![
             Arg {
                 name: "--date",

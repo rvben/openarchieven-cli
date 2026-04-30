@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::cache::Cache;
 use crate::client::{Client, TtlHint};
 use crate::error::{Error, ErrorKind, Result};
@@ -57,7 +55,7 @@ pub fn run(
         params.push(("richness", r));
     }
 
-    let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(30 * 24 * 3600)));
+    let ttl = resolve_ttl(ctx, TtlHint::Never);
     let body = client.get_cached("/related/census.json", &params, ttl, cache)?;
     Ok(Renderable::single_nested(body))
 }
@@ -69,8 +67,8 @@ pub fn schema() -> Command {
         mutating: false,
         response_shape: "single-nested",
         paginated: false,
-        cache_ttl_seconds: Some(30 * 24 * 3600),
-        cache_ttl_strategy: "fixed",
+        cache_ttl_seconds: None,
+        cache_ttl_strategy: "never",
         args: vec![
             Arg {
                 name: "--year",

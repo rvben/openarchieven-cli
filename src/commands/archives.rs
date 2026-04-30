@@ -40,7 +40,7 @@ pub fn run(client: &Client, cache: Option<&Cache>, ctx: &ApiContext) -> Result<R
 }
 
 fn default_ttl() -> TtlHint {
-    TtlHint::Fixed(Duration::from_secs(24 * 3600))
+    TtlHint::Fixed(Duration::from_secs(7 * 24 * 3600))
 }
 
 pub fn schema() -> Command {
@@ -50,7 +50,7 @@ pub fn schema() -> Command {
         mutating: false,
         response_shape: "list",
         paginated: false,
-        cache_ttl_seconds: Some(24 * 3600),
+        cache_ttl_seconds: Some(7 * 24 * 3600),
         cache_ttl_strategy: "fixed",
         args: vec![],
         output_fields: vec![

@@ -43,8 +43,8 @@ pub struct Command {
     pub mutating: bool,
     pub response_shape: &'static str, // "list" | "single-flat" | "single-nested" | "schema" | "none"
     pub paginated: bool,
-    pub cache_ttl_seconds: Option<u64>, // None for non-API commands or "until_midnight"
-    pub cache_ttl_strategy: &'static str, // "fixed" | "until_midnight" | "none"
+    pub cache_ttl_seconds: Option<u64>, // None for non-API commands, "until_midnight", or "never"
+    pub cache_ttl_strategy: &'static str, // "fixed" | "until_midnight" | "never" | "none"
     pub args: Vec<Arg>,
     pub output_fields: Vec<OutputField>,
 }

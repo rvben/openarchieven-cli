@@ -1,5 +1,6 @@
 ---
 source: tests/schema.rs
+assertion_line: 12
 expression: s
 ---
 {
@@ -557,7 +558,7 @@ expression: s
       "mutating": false,
       "response_shape": "list",
       "paginated": false,
-      "cache_ttl_seconds": 86400,
+      "cache_ttl_seconds": 604800,
       "cache_ttl_strategy": "fixed",
       "args": [],
       "output_fields": [
@@ -589,8 +590,8 @@ expression: s
       "mutating": false,
       "response_shape": "single-nested",
       "paginated": false,
-      "cache_ttl_seconds": 2592000,
-      "cache_ttl_strategy": "fixed",
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "never",
       "args": [
         {
           "name": "--year",
@@ -650,8 +651,8 @@ expression: s
       "mutating": false,
       "response_shape": "list",
       "paginated": false,
-      "cache_ttl_seconds": 2592000,
-      "cache_ttl_strategy": "fixed",
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "never",
       "args": [
         {
           "name": "--date",
