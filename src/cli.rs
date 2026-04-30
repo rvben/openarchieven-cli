@@ -46,7 +46,7 @@ pub enum Cmd {
     #[command(name = "match")]
     MatchCmd(ApiArgs),
     /// Birth-event records.
-    Births(ApiArgs),
+    Births(BirthsArgs),
     /// Death-event records.
     Deaths(ApiArgs),
     /// Marriage-event records.
@@ -104,6 +104,76 @@ pub enum CacheCmd {
     },
     /// Drop expired entries.
     Prune,
+}
+
+/// Per-command flags shared by every endpoint subcommand. Flatten into each
+/// subcommand's typed `Args` struct via `#[command(flatten)]`.
+#[derive(Debug, clap::Args)]
+pub struct GlobalApiArgs {
+    /// Per-request timeout (humantime: `30s`, `1m`, `500ms`).
+    #[arg(long, value_parser = humantime::parse_duration)]
+    pub timeout: Option<Duration>,
+
+    /// Bypass cache read AND write for this invocation.
+    #[arg(long)]
+    pub no_cache: bool,
+
+    /// Bypass cache read; still write.
+    #[arg(long)]
+    pub refresh: bool,
+
+    /// Override cache TTL for this invocation. `inf` = never expire.
+    #[arg(long)]
+    pub cache_ttl: Option<String>,
+
+    /// Override cache directory.
+    #[arg(long, env = "OPENARCHIEVEN_CACHE_DIR")]
+    pub cache_dir: Option<PathBuf>,
+
+    /// Top-level field projection (comma-separated).
+    #[arg(long)]
+    pub fields: Option<String>,
+
+    /// Pagination limit (where supported).
+    #[arg(long)]
+    pub limit: Option<u32>,
+
+    /// Pagination offset (where supported).
+    #[arg(long)]
+    pub offset: Option<u32>,
+
+    /// Response language.
+    #[arg(long)]
+    pub lang: Option<String>,
+}
+
+const BIRTHS_EXAMPLES: &str = "\
+Examples:
+  openarchieven births \"Pieter Jansen\" --event-year 1898 --event-place Rotterdam
+  openarchieven births \"de Vries\" --event-province ZH --limit 50
+  openarchieven -o json births \"Jansen\" | jq '.items[] | .personname'
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = BIRTHS_EXAMPLES)]
+pub struct BirthsArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+
+    /// Person name to search for (given name and/or family name).
+    pub name: String,
+
+    /// Filter by event year (YYYY).
+    #[arg(long)]
+    pub event_year: Option<i32>,
+
+    /// Filter by place of event (e.g. `Rotterdam`).
+    #[arg(long)]
+    pub event_place: Option<String>,
+
+    /// Filter by province (e.g. `ZH`, `NH`, `UT`).
+    #[arg(long)]
+    pub event_province: Option<String>,
 }
 
 /// Catch-all positional + flag holder for endpoint commands. Each command's

@@ -52,16 +52,63 @@ impl GlobalArgs {
     }
 }
 
+/// Borrowed view of the raw flag values shared by `ApiArgs` and `GlobalApiArgs`.
+/// Used to avoid duplicating construction logic between the two public entry
+/// points without exceeding clippy's argument-count limit.
+struct ApiContextInput<'a> {
+    timeout: Option<Duration>,
+    no_cache: bool,
+    refresh: bool,
+    cache_ttl: Option<&'a str>,
+    cache_dir: Option<PathBuf>,
+    fields: Option<&'a str>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+    lang: Option<&'a str>,
+}
+
 impl ApiContext {
     pub fn from_args(args: &ApiArgs) -> Result<Self> {
-        if args.no_cache && args.refresh {
+        ApiContextInput {
+            timeout: args.timeout,
+            no_cache: args.no_cache,
+            refresh: args.refresh,
+            cache_ttl: args.cache_ttl.as_deref(),
+            cache_dir: args.cache_dir.clone(),
+            fields: args.fields.as_deref(),
+            limit: args.limit,
+            offset: args.offset,
+            lang: args.lang.as_deref(),
+        }
+        .build()
+    }
+
+    pub fn from_global_args(args: &crate::cli::GlobalApiArgs) -> Result<Self> {
+        ApiContextInput {
+            timeout: args.timeout,
+            no_cache: args.no_cache,
+            refresh: args.refresh,
+            cache_ttl: args.cache_ttl.as_deref(),
+            cache_dir: args.cache_dir.clone(),
+            fields: args.fields.as_deref(),
+            limit: args.limit,
+            offset: args.offset,
+            lang: args.lang.as_deref(),
+        }
+        .build()
+    }
+}
+
+impl ApiContextInput<'_> {
+    fn build(self) -> Result<ApiContext> {
+        if self.no_cache && self.refresh {
             return Err(Error::new(
                 ErrorKind::Validation,
                 "--no-cache and --refresh are mutually exclusive",
             ));
         }
 
-        let cache_ttl_override = match args.cache_ttl.as_deref() {
+        let cache_ttl_override = match self.cache_ttl {
             None => None,
             Some("inf") => Some(TtlOverride::Forever),
             Some("0") => Some(TtlOverride::Disabled),
@@ -78,30 +125,30 @@ impl ApiContext {
         };
 
         let cache_mode =
-            if args.no_cache || matches!(cache_ttl_override, Some(TtlOverride::Disabled)) {
+            if self.no_cache || matches!(cache_ttl_override, Some(TtlOverride::Disabled)) {
                 CacheMode::Bypass
-            } else if args.refresh {
+            } else if self.refresh {
                 CacheMode::Refresh
             } else {
                 CacheMode::Default
             };
 
-        let fields = args.fields.as_deref().map(|s| {
+        let fields = self.fields.map(|s| {
             s.split(',')
                 .map(|f| f.trim().to_string())
                 .filter(|f| !f.is_empty())
                 .collect::<Vec<_>>()
         });
 
-        Ok(Self {
-            timeout: args.timeout.unwrap_or_else(|| Duration::from_secs(30)),
+        Ok(ApiContext {
+            timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             cache_mode,
             cache_ttl_override,
-            cache_dir: args.cache_dir.clone(),
+            cache_dir: self.cache_dir,
             fields,
-            limit: args.limit,
-            offset: args.offset,
-            lang: args.lang.clone().unwrap_or_else(|| "nl".to_string()),
+            limit: self.limit,
+            offset: self.offset,
+            lang: self.lang.unwrap_or("nl").to_string(),
         })
     }
 }
@@ -164,7 +211,7 @@ pub fn resolve_ttl(ctx: &ApiContext, default: TtlHint) -> TtlHint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::ApiArgs;
+    use crate::cli::{ApiArgs, GlobalApiArgs};
     use std::time::Duration;
 
     fn args() -> ApiArgs {
@@ -180,6 +227,35 @@ mod tests {
             lang: None,
             rest: vec![],
         }
+    }
+
+    fn global_args() -> GlobalApiArgs {
+        GlobalApiArgs {
+            timeout: None,
+            no_cache: false,
+            refresh: false,
+            cache_ttl: None,
+            cache_dir: None,
+            fields: None,
+            limit: None,
+            offset: None,
+            lang: None,
+        }
+    }
+
+    #[test]
+    fn from_global_args_no_cache_and_refresh_conflict() {
+        let mut g = global_args();
+        g.no_cache = true;
+        g.refresh = true;
+        let err = ApiContext::from_global_args(&g).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::Validation);
+    }
+
+    #[test]
+    fn from_global_args_lang_defaults_to_nl() {
+        let ctx = ApiContext::from_global_args(&global_args()).unwrap();
+        assert_eq!(ctx.lang, "nl");
     }
 
     #[test]

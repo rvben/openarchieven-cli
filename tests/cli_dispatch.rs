@@ -878,3 +878,56 @@ fn no_color_empty_string_does_not_disable() {
     let v = parse_stdout_json(&out.get_output().stdout);
     assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
 }
+
+// ---------------------------------------------------------------------------
+// births --help: typed-Args migration asserts real positionals/flags shown.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn births_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["births", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(
+        s.contains("<NAME>"),
+        "help should show NAME positional, got: {s}"
+    );
+    assert!(
+        s.contains("--event-year"),
+        "help should mention --event-year: {s}"
+    );
+    assert!(
+        s.contains("--event-place"),
+        "help should mention --event-place: {s}"
+    );
+    assert!(
+        s.contains("--event-province"),
+        "help should mention --event-province: {s}"
+    );
+    assert!(
+        s.contains("Examples:"),
+        "help should have Examples block: {s}"
+    );
+    assert!(
+        s.contains("Pieter Jansen"),
+        "Examples must include Pieter Jansen: {s}"
+    );
+    // Old generic placeholders must be gone.
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+    assert!(
+        !s.contains("deferred to the command"),
+        "stale catch-all doc visible: {s}"
+    );
+}

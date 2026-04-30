@@ -101,10 +101,26 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let parsed = openarchieven::commands::match_record::parse_rest(rest)?;
             openarchieven::commands::match_record::run(client, cache, ctx, &parsed)
         }),
-        Cmd::Births(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::births::parse_rest(rest)?;
-            openarchieven::commands::births::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::Births(args) => {
+            let openarchieven::cli::BirthsArgs {
+                global: global_api,
+                name,
+                event_year,
+                event_place,
+                event_province,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::births::Args {
+                    name,
+                    flags: openarchieven::commands::event_records::CommonFlags {
+                        event_year,
+                        event_place,
+                        event_province,
+                    },
+                };
+                openarchieven::commands::births::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Deaths(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
             let parsed = openarchieven::commands::deaths::parse_rest(rest)?;
             openarchieven::commands::deaths::run(client, cache, ctx, &parsed)
@@ -216,6 +232,29 @@ where
     let client = openarchieven::runtime::build_client(&ctx)?;
     let cache = openarchieven::runtime::build_cache(&ctx)?;
     let mut renderable = f(&client, cache.as_ref(), &ctx, &rest)?;
+    if let Some(fields) = ctx.fields.as_deref() {
+        renderable = openarchieven::output::apply_fields_auto(renderable, fields)?;
+    }
+    let pretty = std::io::stdout().is_terminal();
+    write_stdout(|out| openarchieven::output::render(out, &renderable, global.format, pretty))
+}
+
+fn run_typed_endpoint<F>(
+    api_args: openarchieven::cli::GlobalApiArgs,
+    global: &openarchieven::runtime::GlobalArgs,
+    f: F,
+) -> Result<(), Error>
+where
+    F: FnOnce(
+        &openarchieven::client::Client,
+        Option<&openarchieven::cache::Cache>,
+        &openarchieven::runtime::ApiContext,
+    ) -> Result<openarchieven::output::Renderable, Error>,
+{
+    let ctx = openarchieven::runtime::ApiContext::from_global_args(&api_args)?;
+    let client = openarchieven::runtime::build_client(&ctx)?;
+    let cache = openarchieven::runtime::build_cache(&ctx)?;
+    let mut renderable = f(&client, cache.as_ref(), &ctx)?;
     if let Some(fields) = ctx.fields.as_deref() {
         renderable = openarchieven::output::apply_fields_auto(renderable, fields)?;
     }
