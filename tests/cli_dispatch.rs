@@ -846,3 +846,35 @@ fn no_cache_and_refresh_are_mutually_exclusive() {
         "validation message should name both flags: {msg:?}",
     );
 }
+
+// ---------------------------------------------------------------------------
+// NO_COLOR env var compliance (no-color.org spec).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn no_color_one_disables_color_does_not_error() {
+    // NO_COLOR=1 must not crash; version output must remain valid JSON.
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .env("NO_COLOR", "1")
+        .args(["version"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
+fn no_color_empty_string_does_not_disable() {
+    // no-color.org: an empty value must not be treated as set — normal output expected.
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .env("NO_COLOR", "")
+        .args(["version"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
+}

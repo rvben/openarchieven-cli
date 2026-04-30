@@ -28,8 +28,8 @@ pub struct Cli {
     #[arg(global = true, long, short = 'q')]
     pub quiet: bool,
 
-    /// Disable ANSI colors. Also via NO_COLOR env.
-    #[arg(global = true, long, env = "NO_COLOR")]
+    /// Disable ANSI colors. Also via NO_COLOR env (any non-empty value).
+    #[arg(global = true, long)]
     pub no_color: bool,
 
     #[command(subcommand)]

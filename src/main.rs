@@ -7,10 +7,20 @@ use clap::error::ErrorKind as ClapErrorKind;
 use openarchieven::cli::{ApiArgs, CacheCmd, Cli, Cmd, StatsCmd};
 use openarchieven::error::{Error, ErrorKind, emit_json};
 
+/// Returns `true` when `NO_COLOR` is set to a non-empty value.
+///
+/// Per <https://no-color.org/>: any non-empty value disables color. An empty
+/// string or an absent variable are treated identically (color enabled).
+fn no_color_env() -> bool {
+    std::env::var_os("NO_COLOR")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false)
+}
+
 fn main() -> ExitCode {
     match Cli::try_parse() {
         Ok(cli) => {
-            let no_color = cli.no_color || std::env::var_os("NO_COLOR").is_some();
+            let no_color = cli.no_color || no_color_env();
             match dispatch(cli) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(err) => {
@@ -29,7 +39,7 @@ fn main() -> ExitCode {
                 let _ = clap_err.print();
                 return ExitCode::SUCCESS;
             }
-            let no_color = std::env::var_os("NO_COLOR").is_some();
+            let no_color = no_color_env();
             let err = Error::new(ErrorKind::Validation, clap_err.to_string());
             emit_error(&err, no_color);
             ExitCode::from(err.kind().exit_code())
