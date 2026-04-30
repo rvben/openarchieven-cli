@@ -339,7 +339,14 @@ fn weather_dispatch_sends_date_and_coordinates() {
             ("longitude", "4.0"),
             ("lang", "nl"),
         ],
-        json!({"date": "1900-01-01", "temp": 5.0, "wind": {"speed": 3.0}}),
+        json!([
+            {
+                "STN":      {"label": "stationnummer", "value": "344"},
+                "YYYYMMDD": {"label": "datum", "value": "19000101"},
+                "TG":       {"label": "etmaalgemiddelde temperatuur", "value": "30"},
+                "FHX":      {"label": "hoogste uurgemiddelde windsnelheid", "value": "211"}
+            }
+        ]),
     );
     let out = env
         .cmd()
@@ -355,9 +362,11 @@ fn weather_dispatch_sends_date_and_coordinates() {
         .assert()
         .success();
     let v = parse_stdout_json(&out.get_output().stdout);
-    assert_eq!(v["date"], "1900-01-01");
-    assert_eq!(v["temp"], 5.0);
-    assert_eq!(v["wind"]["speed"], 3.0);
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["paginated"], false);
+    assert_eq!(v["items"][0]["YYYYMMDD"]["value"], "19000101");
+    assert_eq!(v["items"][0]["STN"]["value"], "344");
+    assert_eq!(v["items"][0]["TG"]["value"], "30");
 }
 
 #[test]
@@ -432,8 +441,12 @@ fn stats_firstnames_dispatch_sends_place_and_year() {
     let env = Env::new();
     env.mount_get_with_params(
         "/stats/firstnames.json",
-        &[("place", "Leiden"), ("year", "1850")],
-        json!({"firstnames": [{"firstname": "Jan", "count": 1000}]}),
+        &[
+            ("eventplace", "Leiden"),
+            ("eventyear", "1850"),
+            ("number_show", "20"),
+        ],
+        json!({"response": {"firstnames": [{"firstname": "Jan", "count": 1000}]}}),
     );
     let out = env
         .cmd()
@@ -442,6 +455,7 @@ fn stats_firstnames_dispatch_sends_place_and_year() {
         .success();
     let v = parse_stdout_json(&out.get_output().stdout);
     assert_eq!(v["items"][0]["firstname"], "Jan");
+    assert_eq!(v["items"][0]["count"], 1000);
 }
 
 #[test]
