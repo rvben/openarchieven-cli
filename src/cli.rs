@@ -48,7 +48,7 @@ pub enum Cmd {
     /// Birth-event records.
     Births(BirthsArgs),
     /// Death-event records.
-    Deaths(ApiArgs),
+    Deaths(DeathsArgs),
     /// Marriage-event records.
     Marriages(ApiArgs),
     /// Anniversary records.
@@ -174,6 +174,27 @@ pub struct BirthsArgs {
     /// Filter by province (e.g. `ZH`, `NH`, `UT`).
     #[arg(long)]
     pub event_province: Option<String>,
+}
+
+const DEATHS_EXAMPLES: &str = "\
+Examples:
+  openarchieven deaths \"Anna de Vries\" --event-year 1918 --event-place Amsterdam
+  openarchieven -o json deaths \"Jansen\" --limit 50 | jq '.total'
+";
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = DEATHS_EXAMPLES)]
+pub struct DeathsArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Deceased's name.
+    pub name: String,
+    /// Filter by year of death (YYYY).
+    #[arg(long)]
+    pub event_year: Option<i32>,
+    /// Filter by place of death.
+    #[arg(long)]
+    pub event_place: Option<String>,
 }
 
 /// Catch-all positional + flag holder for endpoint commands. Each command's

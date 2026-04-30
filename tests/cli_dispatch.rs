@@ -931,3 +931,28 @@ fn births_help_shows_real_args_and_examples() {
         "stale catch-all doc visible: {s}"
     );
 }
+
+#[test]
+fn deaths_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["deaths", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("<NAME>"), "help: {s}");
+    assert!(s.contains("--event-year"), "help: {s}");
+    assert!(s.contains("--event-place"), "help: {s}");
+    assert!(
+        !s.contains("--event-province"),
+        "deaths must not advertise --event-province: {s}"
+    );
+    assert!(s.contains("Examples:"), "help: {s}");
+    assert!(s.contains("Anna de Vries"), "help: {s}");
+}

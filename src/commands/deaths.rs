@@ -1,7 +1,6 @@
 use crate::cache::Cache;
 use crate::client::Client;
-use crate::commands::event_records::{CommonFlags, Endpoint, parse_common_flags, run_event};
-use crate::error::{Error, ErrorKind, Result};
+use crate::commands::event_records::{CommonFlags, Endpoint, run_event};
 use crate::output::Renderable;
 use crate::runtime::ApiContext;
 use crate::schema_cmd::{Arg, Command, OutputField};
@@ -12,29 +11,12 @@ pub struct Args {
     pub flags: CommonFlags,
 }
 
-pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let (positional, flags) = parse_common_flags(rest, false, "deaths")?;
-    if positional.len() != 1 {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            format!(
-                "deaths: expected <name>, got {} positional argument(s)",
-                positional.len()
-            ),
-        ));
-    }
-    Ok(Args {
-        name: positional[0].clone(),
-        flags,
-    })
-}
-
 pub fn run(
     client: &Client,
     cache: Option<&Cache>,
     ctx: &ApiContext,
     args: &Args,
-) -> Result<Renderable> {
+) -> Result<Renderable, crate::error::Error> {
     run_event(
         Endpoint {
             command_name: "deaths",
@@ -133,73 +115,5 @@ pub fn schema() -> Command {
                 ty: "boolean",
             },
         ],
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::error::ErrorKind;
-
-    fn strs(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn one_positional_ok() {
-        let a = parse_rest(&strs(&["jansen"])).unwrap();
-        assert_eq!(a.name, "jansen");
-    }
-
-    #[test]
-    fn zero_positionals_is_validation_error() {
-        let err = parse_rest(&[]).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("deaths"));
-    }
-
-    #[test]
-    fn two_positionals_is_validation_error() {
-        let err = parse_rest(&strs(&["a", "b"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("deaths"));
-    }
-
-    #[test]
-    fn event_province_rejected() {
-        let err = parse_rest(&strs(&["jansen", "--event-province=ZH"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("--event-province"),
-            "message: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn event_province_space_form_rejected() {
-        let err = parse_rest(&strs(&["jansen", "--event-province", "ZH"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--event-province"));
-    }
-
-    #[test]
-    fn event_year_eq_form_parses() {
-        let a = parse_rest(&strs(&["jansen", "--event-year=1900"])).unwrap();
-        assert_eq!(a.flags.event_year, Some(1900));
-    }
-
-    #[test]
-    fn event_year_non_integer_is_validation_error() {
-        let err = parse_rest(&strs(&["jansen", "--event-year=abc"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--event-year"));
-    }
-
-    #[test]
-    fn unknown_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["jansen", "--unknown"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--unknown"));
     }
 }
