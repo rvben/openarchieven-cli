@@ -223,10 +223,22 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 openarchieven::commands::census::run(client, cache, ctx, &typed)
             })
         }
-        Cmd::Weather(args) => run_endpoint(args, &global, |client, cache, ctx, rest| {
-            let parsed = openarchieven::commands::weather::parse_rest(rest)?;
-            openarchieven::commands::weather::run(client, cache, ctx, &parsed)
-        }),
+        Cmd::Weather(args) => {
+            let openarchieven::cli::WeatherArgs {
+                global: global_api,
+                date,
+                latitude,
+                longitude,
+            } = args;
+            run_typed_endpoint(global_api, &global, move |client, cache, ctx| {
+                let typed = openarchieven::commands::weather::Args {
+                    date,
+                    latitude,
+                    longitude,
+                };
+                openarchieven::commands::weather::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Stats(StatsCmd::Records(args)) => {
             run_endpoint(args, &global, |client, cache, ctx, rest| {
                 let parsed = openarchieven::commands::stats::records::parse_rest(rest)?;

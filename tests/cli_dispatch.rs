@@ -1078,6 +1078,37 @@ fn yearsago_help_shows_real_args_and_examples() {
 }
 
 #[test]
+fn weather_help_shows_real_args_and_examples() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = assert_cmd::Command::cargo_bin("openarchieven")
+        .unwrap()
+        .env("OPENARCHIEVEN_CACHE_DIR", dir.path())
+        .env_remove("NO_COLOR")
+        .args(["weather", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("--date"), "help must show --date: {s}");
+    assert!(s.contains("--latitude"), "help must show --latitude: {s}");
+    assert!(s.contains("--longitude"), "help must show --longitude: {s}");
+    assert!(
+        s.contains("Examples:"),
+        "help must have Examples block: {s}"
+    );
+    assert!(
+        s.contains("1953-02-01"),
+        "Examples must include example date: {s}"
+    );
+    assert!(
+        !s.contains("[REST]..."),
+        "stale REST placeholder visible: {s}"
+    );
+}
+
+#[test]
 fn census_help_shows_real_args_and_examples() {
     let dir = tempfile::tempdir().unwrap();
     let out = assert_cmd::Command::cargo_bin("openarchieven")

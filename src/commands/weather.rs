@@ -91,75 +91,6 @@ fn validate_decimal(s: &str, name: &str) -> Result<()> {
     })
 }
 
-pub fn parse_rest(rest: &[String]) -> Result<Args> {
-    let mut date: Option<String> = None;
-    let mut lon: Option<String> = None;
-    let mut lat: Option<String> = None;
-    let mut iter = rest.iter().peekable();
-
-    while let Some(tok) = iter.next() {
-        let s = tok.as_str();
-        let (key, val) = if let Some(v) = s.strip_prefix("--date=") {
-            ("--date", v.to_string())
-        } else if let Some(v) = s.strip_prefix("--longitude=") {
-            ("--longitude", v.to_string())
-        } else if let Some(v) = s.strip_prefix("--latitude=") {
-            ("--latitude", v.to_string())
-        } else if matches!(s, "--date" | "--longitude" | "--latitude") {
-            (s, next_value(s, &mut iter)?)
-        } else if s.starts_with("--") {
-            return Err(Error::new(
-                ErrorKind::Validation,
-                format!("unknown flag {s} for `weather`"),
-            ));
-        } else {
-            return Err(Error::new(
-                ErrorKind::Validation,
-                format!("unexpected positional {s} for `weather`"),
-            ));
-        };
-
-        if val.is_empty() {
-            return Err(Error::new(
-                ErrorKind::Validation,
-                format!("{key} requires a non-empty value"),
-            ));
-        }
-        match key {
-            "--date" => date = Some(val),
-            "--longitude" => lon = Some(val),
-            "--latitude" => lat = Some(val),
-            _ => unreachable!(),
-        }
-    }
-
-    Ok(Args {
-        date: date
-            .ok_or_else(|| Error::new(ErrorKind::Validation, "weather: --date is required"))?,
-        longitude: lon
-            .ok_or_else(|| Error::new(ErrorKind::Validation, "weather: --longitude is required"))?,
-        latitude: lat
-            .ok_or_else(|| Error::new(ErrorKind::Validation, "weather: --latitude is required"))?,
-    })
-}
-
-fn next_value(
-    flag: &str,
-    iter: &mut std::iter::Peekable<std::slice::Iter<'_, String>>,
-) -> Result<String> {
-    match iter.next() {
-        Some(v) if v.starts_with("--") => Err(Error::new(
-            ErrorKind::Validation,
-            format!("{flag}: missing value (got flag '{v}' instead)"),
-        )),
-        Some(v) => Ok(v.clone()),
-        None => Err(Error::new(
-            ErrorKind::Validation,
-            format!("{flag}: missing value"),
-        )),
-    }
-}
-
 pub fn schema() -> Command {
     Command {
         name: "weather",
@@ -240,70 +171,6 @@ pub fn schema() -> Command {
 mod tests {
     use super::*;
 
-    fn strs(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn parse_rest_all_required_ok() {
-        let a = parse_rest(&strs(&[
-            "--date=1850-06-15",
-            "--longitude=4.49",
-            "--latitude=52.16",
-        ]))
-        .unwrap();
-        assert_eq!(a.date, "1850-06-15");
-        assert_eq!(a.longitude, "4.49");
-        assert_eq!(a.latitude, "52.16");
-    }
-
-    #[test]
-    fn parse_rest_space_form_works() {
-        let a = parse_rest(&strs(&[
-            "--date",
-            "1850-06-15",
-            "--longitude",
-            "4.49",
-            "--latitude",
-            "52.16",
-        ]))
-        .unwrap();
-        assert_eq!(a.date, "1850-06-15");
-    }
-
-    #[test]
-    fn parse_rest_missing_date_is_validation_error() {
-        let err = parse_rest(&strs(&["--longitude=4.49", "--latitude=52.16"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--date"));
-    }
-
-    #[test]
-    fn parse_rest_missing_longitude_is_validation_error() {
-        let err = parse_rest(&strs(&["--date=1850-06-15", "--latitude=52.16"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--longitude"));
-    }
-
-    #[test]
-    fn parse_rest_unknown_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["--zzz=x"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--zzz"));
-    }
-
-    #[test]
-    fn parse_rest_unexpected_positional_is_validation_error() {
-        let err = parse_rest(&strs(&[
-            "extra",
-            "--date=1850-06-15",
-            "--longitude=4.49",
-            "--latitude=52.16",
-        ]))
-        .unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-    }
-
     #[test]
     fn validate_iso_date_accepts_valid() {
         assert!(validate_iso_date("1850-06-15").is_ok());
@@ -316,62 +183,6 @@ mod tests {
         assert!(validate_iso_date("1850/06/15").is_err());
         assert!(validate_iso_date("18500-06-15").is_err());
         assert!(validate_iso_date("1850-6-15").is_err());
-    }
-
-    #[test]
-    fn parse_rest_missing_latitude_is_validation_error() {
-        let err = parse_rest(&strs(&["--date=1850-06-15", "--longitude=4.49"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(
-            err.message().contains("--latitude"),
-            "msg: {}",
-            err.message()
-        );
-    }
-
-    #[test]
-    fn parse_rest_empty_date_is_validation_error() {
-        let err =
-            parse_rest(&strs(&["--date=", "--longitude=4.49", "--latitude=52.16"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--date"));
-    }
-
-    #[test]
-    fn parse_rest_empty_longitude_is_validation_error() {
-        let err = parse_rest(&strs(&[
-            "--date=1850-06-15",
-            "--longitude=",
-            "--latitude=52.16",
-        ]))
-        .unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--longitude"));
-    }
-
-    #[test]
-    fn parse_rest_empty_latitude_is_validation_error() {
-        let err = parse_rest(&strs(&[
-            "--date=1850-06-15",
-            "--longitude=4.49",
-            "--latitude=",
-        ]))
-        .unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--latitude"));
-    }
-
-    #[test]
-    fn parse_rest_flag_at_end_is_validation_error() {
-        let err = parse_rest(&strs(&["--date"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
-        assert!(err.message().contains("--date"));
-    }
-
-    #[test]
-    fn parse_rest_flag_followed_by_flag_is_validation_error() {
-        let err = parse_rest(&strs(&["--date", "--longitude"])).unwrap_err();
-        assert_eq!(err.kind(), ErrorKind::Validation);
     }
 
     #[test]

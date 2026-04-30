@@ -58,7 +58,7 @@ pub enum Cmd {
     /// Census records by place/year.
     Census(CensusArgs),
     /// Historical weather observations.
-    Weather(ApiArgs),
+    Weather(WeatherArgs),
 
     /// Aggregate statistics endpoints.
     #[command(subcommand)]
@@ -196,6 +196,34 @@ pub struct CensusArgs {
     /// Detail level: 1, 2, or 3 (3 = most detailed).
     #[arg(long, value_parser = clap::value_parser!(i32).range(1..=3))]
     pub richness: Option<i32>,
+}
+
+const WEATHER_EXAMPLES: &str = "\
+Examples:
+  openarchieven weather --date 1953-02-01 --latitude 51.83 --longitude 3.91
+  openarchieven -o json weather --date 1944-09-17 --latitude 51.98 --longitude 5.91 --lang en
+";
+
+fn parse_decimal_str(s: &str) -> Result<String, String> {
+    s.parse::<f64>()
+        .map(|_| s.to_owned())
+        .map_err(|_| format!("must be a decimal number, got {s:?}"))
+}
+
+#[derive(Debug, clap::Args)]
+#[command(after_help = WEATHER_EXAMPLES)]
+pub struct WeatherArgs {
+    #[command(flatten)]
+    pub global: GlobalApiArgs,
+    /// Date as YYYY-MM-DD.
+    #[arg(long)]
+    pub date: String,
+    /// Decimal latitude.
+    #[arg(long, value_parser = parse_decimal_str)]
+    pub latitude: String,
+    /// Decimal longitude.
+    #[arg(long, value_parser = parse_decimal_str)]
+    pub longitude: String,
 }
 
 const MATCH_EXAMPLES: &str = "\
