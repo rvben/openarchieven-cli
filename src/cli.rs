@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[value(rename_all = "lowercase")]
 pub enum FormatArg {
     Json,
+    Ndjson,
     Table,
     Markdown,
 }
@@ -20,9 +21,13 @@ pub enum FormatArg {
     disable_help_subcommand = true
 )]
 pub struct Cli {
-    /// Output format. Defaults: TTY → table, pipe → json.
+    /// Output format. Defaults: TTY → table, pipe → json. `ndjson` is only valid for list responses.
     #[arg(global = true, long, short = 'o', value_enum)]
     pub output: Option<FormatArg>,
+
+    /// Pretty-print JSON output. Default: pretty on TTY, compact when piped.
+    #[arg(global = true, long)]
+    pub pretty: bool,
 
     /// Suppress stderr progress output.
     #[arg(global = true, long, short = 'q')]
@@ -105,6 +110,9 @@ pub enum StatsCmd {
     /// Profession frequency stats.
     #[command(after_help = STATS_PROFESSIONS_EXAMPLES)]
     Professions(StatsProfessionsArgs),
+    /// Cross-tabulation aggregation grouped by one dimension.
+    #[command(after_help = STATS_BREAKDOWN_EXAMPLES)]
+    Breakdown(StatsBreakdownArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -536,4 +544,60 @@ pub struct StatsProfessionsArgs {
     pub year_start: Option<i32>,
     #[arg(long)]
     pub year_end: Option<i32>,
+}
+
+const STATS_BREAKDOWN_EXAMPLES: &str = "\
+Examples:
+  openarchieven stats breakdown archive --source-type Bidprentjesverzameling
+  openarchieven stats breakdown year --place Amsterdam --event-type 2
+  openarchieven -o json stats breakdown eventtype --archive elo | jq '.results'
+";
+
+fn parse_group_by(s: &str) -> std::result::Result<String, String> {
+    match s {
+        "archive" | "sourcetype" | "eventtype" | "place" | "year" => Ok(s.to_string()),
+        _ => Err(format!(
+            "'{s}' is not a valid group_by (allowed: archive, sourcetype, eventtype, place, year)"
+        )),
+    }
+}
+
+fn parse_breakdown_sort(s: &str) -> std::result::Result<String, String> {
+    match s {
+        "count_desc" | "count_asc" | "name_asc" => Ok(s.to_string()),
+        _ => Err(format!(
+            "'{s}' is not a valid sort (allowed: count_desc, count_asc, name_asc)"
+        )),
+    }
+}
+
+#[derive(Debug, clap::Args)]
+pub struct StatsBreakdownArgs {
+    /// Dimension to aggregate on: archive, sourcetype, eventtype, place, year.
+    #[arg(value_parser = parse_group_by)]
+    pub group_by: String,
+    /// Archive code filter. Prefix with `!` to negate (e.g. `!saa`).
+    #[arg(long)]
+    pub archive: Option<String>,
+    /// Source-type filter. Combine multiple with ` & ` (space, ampersand, space).
+    #[arg(long)]
+    pub source_type: Option<String>,
+    /// Event-type filter: 0 (all), 1 (birth), 2 (marriage), 3 (death), 6 (notarial).
+    #[arg(long, value_parser = parse_event_type)]
+    pub event_type: Option<i32>,
+    /// Event place filter (exact match).
+    #[arg(long)]
+    pub place: Option<String>,
+    /// Lower bound of event years (1500..=1960).
+    #[arg(long)]
+    pub year_start: Option<i32>,
+    /// Upper bound of event years (1500..=1960).
+    #[arg(long)]
+    pub year_end: Option<i32>,
+    /// Exclude groups below this count.
+    #[arg(long)]
+    pub min_count: Option<u32>,
+    /// Sort order: count_desc (default), count_asc, name_asc.
+    #[arg(long, value_parser = parse_breakdown_sort)]
+    pub sort: Option<String>,
 }

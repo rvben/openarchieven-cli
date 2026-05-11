@@ -1686,3 +1686,274 @@ fn transcripts_show_404_is_not_found_with_stderr_error() {
     let v = last_json_line(&out.get_output().stderr);
     assert_eq!(v["error"]["kind"], "not_found");
 }
+
+// ---------------------------------------------------------------------------
+// Agentic output mode tests: compact-by-default JSON, --pretty opt-in,
+// ndjson streaming, nested --fields projection.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn json_output_is_compact_when_piped() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1"}]}}),
+    );
+    let out = env.cmd().args(["search", "jansen"]).assert().success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout);
+    // Compact JSON: single line, no two-space indent anywhere.
+    let trimmed = stdout.trim_end();
+    assert!(
+        !trimmed.contains("\n  "),
+        "expected compact JSON when piped, got:\n{stdout}"
+    );
+    assert!(
+        !trimmed.contains("\"items\": ["),
+        "expected no space after colon (compact), got:\n{stdout}"
+    );
+    // Still valid JSON.
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(v["items"][0]["id"], "r-1");
+}
+
+#[test]
+fn json_output_pretty_flag_forces_indented_output() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({"response": {"numFound": 1, "docs": [{"id": "r-1"}]}}),
+    );
+    let out = env
+        .cmd()
+        .args(["--pretty", "search", "jansen"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout);
+    assert!(
+        stdout.contains("\n  \"items\": ["),
+        "expected pretty JSON with indent, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn schema_is_compact_when_piped() {
+    let env = Env::new();
+    let out = env.cmd().arg("schema").assert().success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout);
+    // Schema must be valid JSON.
+    let _: Value = serde_json::from_str(stdout.trim()).expect("schema is JSON");
+    // Compact: no two-space indent anywhere.
+    assert!(
+        !stdout.contains("\n  \"name\""),
+        "expected compact schema when piped, got first 200 chars:\n{}",
+        &stdout[..stdout.len().min(200)]
+    );
+}
+
+#[test]
+fn schema_pretty_flag_forces_indented_output() {
+    let env = Env::new();
+    let out = env.cmd().args(["--pretty", "schema"]).assert().success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout);
+    assert!(
+        stdout.contains("\n  \"name\": \"openarchieven\""),
+        "expected pretty schema, got first 200 chars:\n{}",
+        &stdout[..stdout.len().min(200)]
+    );
+}
+
+#[test]
+fn ndjson_emits_one_doc_per_line_for_list_endpoint() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({
+            "response": {
+                "numFound": 3,
+                "docs": [
+                    {"id": "r-1", "name": "Jan"},
+                    {"id": "r-2", "name": "Piet"},
+                    {"id": "r-3", "name": "Klaas"}
+                ]
+            }
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["-o", "ndjson", "search", "jansen"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 3, "expected 3 ndjson lines, got:\n{stdout}");
+
+    let l0: Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(l0["id"], "r-1");
+    let l2: Value = serde_json::from_str(lines[2]).unwrap();
+    assert_eq!(l2["id"], "r-3");
+
+    // No envelope keys leak into ndjson output.
+    assert!(!stdout.contains("\"items\""));
+    assert!(!stdout.contains("\"total\""));
+    assert!(!stdout.contains("\"paginated\""));
+}
+
+#[test]
+fn ndjson_rejects_single_nested_response() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/show.json",
+        json!({"record": {"id": "abc", "name": "Jan"}}),
+    );
+    let out = env
+        .cmd()
+        .args(["-o", "ndjson", "show", "elo", "abc"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "validation");
+    assert!(
+        v["error"]["message"].as_str().unwrap().contains("ndjson"),
+        "expected ndjson rejection message, got: {v}"
+    );
+}
+
+#[test]
+fn ndjson_rejects_single_flat_response() {
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .args(["-o", "ndjson", "version"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "validation");
+}
+
+#[test]
+fn ndjson_rejects_schema_command() {
+    let env = Env::new();
+    let out = env
+        .cmd()
+        .args(["-o", "ndjson", "schema"])
+        .assert()
+        .failure();
+    let v = last_json_line(&out.get_output().stderr);
+    assert_eq!(v["error"]["kind"], "validation");
+}
+
+#[test]
+fn nested_fields_projection_keeps_only_named_subpaths() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({
+            "response": {
+                "numFound": 2,
+                "docs": [
+                    {
+                        "id": "r-1",
+                        "personname": "Jan Jansen",
+                        "eventdate": {"day": 1, "month": 6, "year": 1900},
+                        "archive_code": "elo"
+                    },
+                    {
+                        "id": "r-2",
+                        "personname": "Piet Pietersen",
+                        "eventdate": {"day": 2, "month": 7, "year": 1901},
+                        "archive_code": "rzh"
+                    }
+                ]
+            }
+        }),
+    );
+    let out = env
+        .cmd()
+        .args(["search", "--fields", "id,eventdate.year", "jansen"])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    let item0 = v["items"][0].as_object().unwrap();
+    let item1 = v["items"][1].as_object().unwrap();
+    assert_eq!(item0.len(), 2);
+    assert_eq!(item0["id"], "r-1");
+    assert_eq!(item0["eventdate"], json!({"year": 1900}));
+    assert!(!item0.contains_key("personname"));
+    assert!(!item0.contains_key("archive_code"));
+    assert_eq!(item1["eventdate"], json!({"year": 1901}));
+}
+
+#[test]
+fn nested_fields_projects_single_nested_response() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/show.json",
+        json!({
+            "record": {
+                "id": "abc",
+                "personname": "Jan Jansen",
+                "eventdate": {"day": 1, "month": 6, "year": 1900}
+            }
+        }),
+    );
+    // The `show` body is the raw upstream envelope `{record: {...}}` — top-level
+    // projection narrows it to just `record`, and dot-paths reach inside.
+    let out = env
+        .cmd()
+        .args([
+            "--fields",
+            "record.id,record.eventdate.year",
+            "show",
+            "elo",
+            "abc",
+        ])
+        .assert()
+        .success();
+    let v = parse_stdout_json(&out.get_output().stdout);
+    assert_eq!(
+        v,
+        json!({"record": {"id": "abc", "eventdate": {"year": 1900}}})
+    );
+}
+
+#[test]
+fn ndjson_with_nested_fields_streams_filtered_lines() {
+    let env = Env::new();
+    env.mount_get(
+        "/records/search.json",
+        json!({
+            "response": {
+                "numFound": 2,
+                "docs": [
+                    {
+                        "id": "r-1",
+                        "personname": "Jan Jansen",
+                        "eventdate": {"day": 1, "month": 6, "year": 1900}
+                    },
+                    {
+                        "id": "r-2",
+                        "personname": "Piet Pietersen",
+                        "eventdate": {"day": 2, "month": 7, "year": 1901}
+                    }
+                ]
+            }
+        }),
+    );
+    let out = env
+        .cmd()
+        .args([
+            "-o",
+            "ndjson",
+            "search",
+            "--fields",
+            "id,eventdate.year",
+            "jansen",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&out.get_output().stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 2);
+    let l0: Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(l0, json!({"id": "r-1", "eventdate": {"year": 1900}}));
+}

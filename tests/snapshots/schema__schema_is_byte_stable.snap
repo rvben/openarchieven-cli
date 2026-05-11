@@ -1,5 +1,6 @@
 ---
 source: tests/schema.rs
+assertion_line: 12
 expression: s
 ---
 {
@@ -12,6 +13,7 @@ expression: s
   },
   "output_formats": [
     "json",
+    "ndjson",
     "table",
     "markdown"
   ],

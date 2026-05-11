@@ -12,6 +12,7 @@ use crate::tty::{Format, Stream, is_tty, resolve_format};
 #[derive(Debug, Clone)]
 pub struct GlobalArgs {
     pub format: Format,
+    pub pretty: bool,
     pub quiet: bool,
     pub no_color: bool,
 }
@@ -40,13 +41,16 @@ impl GlobalArgs {
     pub fn from_cli(cli: &Cli) -> Self {
         let explicit = cli.output.map(|f| match f {
             FormatArg::Json => Format::Json,
+            FormatArg::Ndjson => Format::Ndjson,
             FormatArg::Table => Format::Table,
             FormatArg::Markdown => Format::Markdown,
         });
         let env = std::env::var("OPENARCHIEVEN_OUTPUT").ok();
-        let format = resolve_format(explicit, env.as_deref(), is_tty(Stream::Stdout));
+        let stdout_tty = is_tty(Stream::Stdout);
+        let format = resolve_format(explicit, env.as_deref(), stdout_tty);
         Self {
             format,
+            pretty: cli.pretty || stdout_tty,
             quiet: cli.quiet,
             no_color: cli.no_color || std::env::var_os("NO_COLOR").is_some(),
         }
@@ -400,6 +404,7 @@ mod tests {
         use crate::cli::{Cli, Cmd};
         let cli = Cli {
             output: None,
+            pretty: false,
             quiet: false,
             no_color: false,
             api: args(),
@@ -415,6 +420,7 @@ mod tests {
         use crate::cli::{Cli, Cmd, FormatArg};
         let cli = Cli {
             output: Some(FormatArg::Json),
+            pretty: false,
             quiet: false,
             no_color: false,
             api: args(),
@@ -429,6 +435,7 @@ mod tests {
         use crate::cli::{Cli, Cmd, FormatArg};
         let cli = Cli {
             output: Some(FormatArg::Table),
+            pretty: false,
             quiet: true,
             no_color: true,
             api: args(),
@@ -445,6 +452,7 @@ mod tests {
         use crate::cli::{Cli, Cmd, FormatArg};
         let cli = Cli {
             output: Some(FormatArg::Markdown),
+            pretty: false,
             quiet: false,
             no_color: false,
             api: args(),

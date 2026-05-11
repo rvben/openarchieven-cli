@@ -77,12 +77,24 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
         Cmd::Version => {
             let body = serde_json::json!({ "version": env!("CARGO_PKG_VERSION") });
             let renderable = crate::output::Renderable::single_flat(body);
-            let pretty = std::io::stdout().is_terminal();
-            write_stdout(|out| crate::output::render(out, &renderable, global.format, pretty))
+            crate::output::ensure_format_compatible(&renderable, global.format)?;
+            write_stdout(|out| {
+                crate::output::render(out, &renderable, global.format, global.pretty)
+            })
         }
         Cmd::Schema => {
             let schema = crate::schema_cmd::build();
-            let json = serde_json::to_string_pretty(&schema).expect("schema always serializes");
+            if global.format == crate::tty::Format::Ndjson {
+                return Err(Error::new(
+                    ErrorKind::Validation,
+                    "--output ndjson is not valid for `schema` (use json)",
+                ));
+            }
+            let json = if global.pretty {
+                serde_json::to_string_pretty(&schema).expect("schema always serializes")
+            } else {
+                serde_json::to_string(&schema).expect("schema always serializes")
+            };
             write_stdout(|out| writeln!(out, "{json}"))
         }
         Cmd::Archives(_args) => run_typed_endpoint(api, &global, |client, cache, ctx| {
@@ -298,6 +310,33 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 crate::commands::stats::professions::run(client, cache, ctx, &typed)
             })
         }
+        Cmd::Stats(StatsCmd::Breakdown(args)) => {
+            let crate::cli::StatsBreakdownArgs {
+                group_by,
+                archive,
+                source_type,
+                event_type,
+                place,
+                year_start,
+                year_end,
+                min_count,
+                sort,
+            } = args;
+            run_typed_endpoint(api, &global, move |client, cache, ctx| {
+                let typed = crate::commands::stats::breakdown::Args {
+                    group_by,
+                    archive,
+                    source_type,
+                    event_type,
+                    place,
+                    year_start,
+                    year_end,
+                    min_count,
+                    sort,
+                };
+                crate::commands::stats::breakdown::run(client, cache, ctx, &typed)
+            })
+        }
         Cmd::Transcripts(TranscriptsCmd::Search(args)) => {
             let crate::cli::TranscriptsSearchArgs {
                 q,
@@ -362,8 +401,8 @@ where
         })?;
     let cache = crate::cache::Cache::open(dir, false)?;
     let renderable = f(&cache)?;
-    let pretty = std::io::stdout().is_terminal();
-    write_stdout(|out| crate::output::render(out, &renderable, global.format, pretty))
+    crate::output::ensure_format_compatible(&renderable, global.format)?;
+    write_stdout(|out| crate::output::render(out, &renderable, global.format, global.pretty))
 }
 
 fn run_typed_endpoint<F>(
@@ -386,8 +425,8 @@ where
     if let Some(fields) = ctx.fields.as_deref() {
         renderable = crate::output::apply_fields_auto(renderable, fields)?;
     }
-    let pretty = std::io::stdout().is_terminal();
-    write_stdout(|out| crate::output::render(out, &renderable, global.format, pretty))
+    crate::output::ensure_format_compatible(&renderable, global.format)?;
+    write_stdout(|out| crate::output::render(out, &renderable, global.format, global.pretty))
 }
 
 /// When the user did not pass `--limit` and the API reports more total

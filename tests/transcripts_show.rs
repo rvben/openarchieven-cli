@@ -248,31 +248,6 @@ fn show_rejects_pagination_flags() {
 }
 
 #[test]
-fn show_rejects_fields_filter() {
-    let rt = rt();
-    let server = rt.block_on(MockServer::start());
-
-    let dir = tempdir().unwrap();
-    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
-    let client = client(&server);
-
-    let mut ctx = ctx();
-    ctx.fields = Some(vec!["id".into()]);
-
-    let err = show::run(
-        &client,
-        Some(&cache),
-        &ctx,
-        &show::Args {
-            id: "NL-X_1_1".into(),
-        },
-    )
-    .unwrap_err();
-    assert_eq!(err.kind(), ErrorKind::Validation);
-    assert!(err.message().contains("--fields"), "msg: {}", err.message());
-}
-
-#[test]
 fn show_schema_contract() {
     let s = show::schema();
     assert_eq!(s.name, "transcripts show");

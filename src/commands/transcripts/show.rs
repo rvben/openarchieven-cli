@@ -21,12 +21,6 @@ pub fn run(
     if args.id.is_empty() {
         return Err(Error::new(ErrorKind::Validation, "id: must not be empty"));
     }
-    if ctx.fields.is_some() {
-        return Err(Error::new(
-            ErrorKind::Validation,
-            "--fields is not supported for `transcripts show` (single-nested shape); use `-o json | jq`",
-        ));
-    }
     if !SUPPORTED_LANGS.contains(&ctx.lang.as_str()) {
         return Err(Error::new(
             ErrorKind::Validation,

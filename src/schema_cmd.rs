@@ -90,7 +90,7 @@ pub fn build() -> Schema {
             requests_per_second: 4,
             scope: "per_ip",
         },
-        output_formats: vec!["json", "table", "markdown"],
+        output_formats: vec!["json", "ndjson", "table", "markdown"],
         env_vars: vec![
             EnvVar {
                 name: "OPENARCHIEVEN_BASE_URL",
@@ -252,9 +252,12 @@ mod tests {
     }
 
     #[test]
-    fn build_emits_three_output_formats() {
+    fn build_emits_four_output_formats() {
         let s = build();
-        assert_eq!(s.output_formats, vec!["json", "table", "markdown"]);
+        assert_eq!(
+            s.output_formats,
+            vec!["json", "ndjson", "table", "markdown"]
+        );
     }
 
     #[test]

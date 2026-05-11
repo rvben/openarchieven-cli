@@ -18,6 +18,7 @@ pub fn is_tty(stream: Stream) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Json,
+    Ndjson,
     Table,
     Markdown,
 }
@@ -26,6 +27,7 @@ impl Format {
     pub fn parse(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "json" => Some(Format::Json),
+            "ndjson" => Some(Format::Ndjson),
             "table" => Some(Format::Table),
             "markdown" => Some(Format::Markdown),
             _ => None,
@@ -35,6 +37,7 @@ impl Format {
     pub fn as_str(self) -> &'static str {
         match self {
             Format::Json => "json",
+            Format::Ndjson => "ndjson",
             Format::Table => "table",
             Format::Markdown => "markdown",
         }
@@ -85,6 +88,7 @@ mod tests {
     #[test]
     fn format_parse_all_variants() {
         assert_eq!(Format::parse("json"), Some(Format::Json));
+        assert_eq!(Format::parse("ndjson"), Some(Format::Ndjson));
         assert_eq!(Format::parse("table"), Some(Format::Table));
         assert_eq!(Format::parse("markdown"), Some(Format::Markdown));
         assert_eq!(Format::parse("xml"), None);
@@ -94,13 +98,19 @@ mod tests {
     #[test]
     fn format_as_str_round_trips() {
         assert_eq!(Format::Json.as_str(), "json");
+        assert_eq!(Format::Ndjson.as_str(), "ndjson");
         assert_eq!(Format::Table.as_str(), "table");
         assert_eq!(Format::Markdown.as_str(), "markdown");
     }
 
     #[test]
     fn format_display_matches_as_str() {
-        for f in [Format::Json, Format::Table, Format::Markdown] {
+        for f in [
+            Format::Json,
+            Format::Ndjson,
+            Format::Table,
+            Format::Markdown,
+        ] {
             assert_eq!(format!("{f}"), f.as_str());
         }
     }
