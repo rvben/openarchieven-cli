@@ -409,7 +409,9 @@ mod tests {
 
     #[test]
     fn rate_limiter_throttles_burst() {
-        // 2 req/sec → 5 requests should take at least ~1.5s (3 of them throttled).
+        // 2 req/sec → 5 requests cost 3 × 500ms of throttling. The 50ms tolerance
+        // absorbs clock skew between governor's bucket and Instant::now() — without
+        // it the assertion lands at the theoretical lower bound and flakes on slow CI.
         let cfg = ClientConfig {
             rate_limit_per_sec: 2,
             ..ClientConfig::default()
@@ -419,10 +421,10 @@ mod tests {
         for _ in 0..5 {
             client.acquire_for_test();
         }
+        let elapsed = start.elapsed();
         assert!(
-            start.elapsed() >= std::time::Duration::from_millis(1500),
-            "expected throttling, took {:?}",
-            start.elapsed()
+            elapsed >= std::time::Duration::from_millis(1450),
+            "expected throttling, took {elapsed:?}"
         );
     }
 
