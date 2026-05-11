@@ -40,7 +40,7 @@ pub fn run(
     let yr = args.birthyear.to_string();
     let params: Vec<(&str, &str)> = vec![
         ("name", args.name.as_str()),
-        ("birth_year", yr.as_str()),
+        ("birthyear", yr.as_str()),
         ("lang", ctx.lang.as_str()),
     ];
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(6 * 3600)));

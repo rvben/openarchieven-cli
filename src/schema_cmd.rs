@@ -199,6 +199,7 @@ fn commands() -> Vec<Command> {
         crate::commands::stats::familynames::schema(),
         crate::commands::stats::firstnames::schema(),
         crate::commands::stats::professions::schema(),
+        crate::commands::stats::breakdown::schema(),
         crate::commands::transcripts::search::schema(),
         crate::commands::transcripts::browse::schema(),
         crate::commands::transcripts::show::schema(),
@@ -257,8 +258,8 @@ mod tests {
     }
 
     #[test]
-    fn build_emits_twentyfive_commands() {
-        // 17 API/CLI commands + 3 transcripts subcommands + cache info/clear/prune + schema + version.
-        assert_eq!(build().commands.len(), 25);
+    fn build_emits_twentysix_commands() {
+        // 18 API/CLI commands + 3 transcripts subcommands + cache info/clear/prune + schema + version.
+        assert_eq!(build().commands.len(), 26);
     }
 }

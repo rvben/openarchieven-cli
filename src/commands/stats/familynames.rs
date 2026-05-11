@@ -90,16 +90,16 @@ pub fn run(
         ("lang", ctx.lang.as_str()),
     ];
     if let Some(p) = args.place.as_deref() {
-        params.push(("place", p));
+        params.push(("eventplace", p));
     }
     if let Some(s) = ys.as_deref() {
-        params.push(("year_start", s));
+        params.push(("eventyearstart", s));
     }
     if let Some(s) = ye.as_deref() {
-        params.push(("year_end", s));
+        params.push(("eventyearend", s));
     }
     if let Some(s) = et.as_deref() {
-        params.push(("event_type", s));
+        params.push(("eventtype", s));
     }
 
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));
@@ -202,9 +202,9 @@ pub fn schema() -> Command {
                 r#enum: Some(vec![
                     serde_json::json!({"value": 0, "label": "all", "description": "All event types"}),
                     serde_json::json!({"value": 1, "label": "birth", "description": "Geboorte"}),
-                    serde_json::json!({"value": 2, "label": "death", "description": "Overlijden"}),
-                    serde_json::json!({"value": 3, "label": "marriage", "description": "Huwelijk"}),
-                    serde_json::json!({"value": 6, "label": "other", "description": "Other registrations"}),
+                    serde_json::json!({"value": 2, "label": "marriage", "description": "Huwelijk"}),
+                    serde_json::json!({"value": 3, "label": "death", "description": "Overlijden"}),
+                    serde_json::json!({"value": 6, "label": "notarial", "description": "Notariële akten"}),
                 ]),
             },
             Arg {

@@ -1,0 +1,72 @@
+name: OpenAPI Spec Drift
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC — pick up upstream changes once a week.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Detect drift
+        id: drift
+        run: |
+          status=0
+          make openapi-check || status=$?
+          case "$status" in
+            0) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
+            1) echo "changed=true"  >> "$GITHUB_OUTPUT" ;;
+            *) echo "openapi-check failed with status $status" >&2; exit "$status" ;;
+          esac
+
+      - name: Refresh spec
+        if: steps.drift.outputs.changed == 'true'
+        run: make openapi-refresh
+
+      - name: Verify build still passes
+        if: steps.drift.outputs.changed == 'true'
+        run: make check
+
+      - name: Open pull request
+        if: steps.drift.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/openapi-refresh
+          title: "chore(openapi): refresh vendored spec"
+          commit-message: "chore(openapi): refresh vendored spec"
+          body: |
+            Automated weekly refresh of the vendored OpenAPI spec from
+            `https://api.openarchieven.nl/openapi.yaml`.
+
+            - Updates `openapi/openarchieven.yaml`
+            - Updates `openapi/openarchieven.sha256`
+            - Regenerates `openapi/params-manifest.json`
+
+            The contract tests in `tests/openapi_contract.rs` ran green against
+            the refreshed manifest before this PR was opened. Review the diff
+            to confirm any new/removed query parameters are intentional.
+          add-paths: |
+            openapi/openarchieven.yaml
+            openapi/openarchieven.sha256
+            openapi/params-manifest.json

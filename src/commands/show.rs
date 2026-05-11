@@ -44,7 +44,7 @@ pub fn run(
     }
 
     let params: Vec<(&str, &str)> = vec![
-        ("archive_code", args.archive.as_str()),
+        ("archive", args.archive.as_str()),
         ("identifier", args.identifier.as_str()),
         ("lang", ctx.lang.as_str()),
     ];

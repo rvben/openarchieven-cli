@@ -38,6 +38,7 @@ fn schema_command_list_is_complete() {
         "stats familynames",
         "stats firstnames",
         "stats professions",
+        "stats breakdown",
         "transcripts search",
         "transcripts browse",
         "transcripts show",

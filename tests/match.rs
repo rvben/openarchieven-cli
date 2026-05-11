@@ -50,7 +50,7 @@ fn match_returns_list_non_paginated() {
         Mock::given(method("GET"))
             .and(path("/records/match.json"))
             .and(query_param("name", "Jan Jansen"))
-            .and(query_param("birth_year", "1850"))
+            .and(query_param("birthyear", "1850"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "response": {
                     "docs": [{"id": "x"}, {"id": "y"}]

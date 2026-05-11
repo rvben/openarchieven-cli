@@ -27,7 +27,7 @@ pub fn run(
         client,
         cache,
         ctx,
-        ("name", args.name1.as_str()),
+        ("name1", args.name1.as_str()),
         Some(("name2", args.name2.as_str())),
         &args.flags,
     )

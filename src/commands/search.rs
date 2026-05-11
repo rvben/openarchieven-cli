@@ -69,19 +69,19 @@ pub fn run(
         params.push(("archive_code", v.as_str()));
     }
     if let Some(ref v) = args.source_type {
-        params.push(("source_type", v.as_str()));
+        params.push(("sourcetype", v.as_str()));
     }
     if let Some(ref v) = args.event_place {
-        params.push(("event_place", v.as_str()));
+        params.push(("eventplace", v.as_str()));
     }
     if let Some(ref v) = args.birth_place {
-        params.push(("birth_place", v.as_str()));
+        params.push(("birthplace", v.as_str()));
     }
     if let Some(ref v) = args.relation_type {
-        params.push(("relation_type", v.as_str()));
+        params.push(("relationtype", v.as_str()));
     }
     if let Some(ref v) = args.country {
-        params.push(("country", v.as_str()));
+        params.push(("country_code", v.as_str()));
     }
     let sort_str;
     if let Some(s) = args.sort {

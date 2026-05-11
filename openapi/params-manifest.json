@@ -1,0 +1,234 @@
+{
+  "/records/getBirths.json": {
+    "method": "GET",
+    "operationId": "getBirths",
+    "query_params": [
+      "eventplace",
+      "eventprovince",
+      "eventyear",
+      "name",
+      "number_show",
+      "start"
+    ]
+  },
+  "/records/getDeaths.json": {
+    "method": "GET",
+    "operationId": "getDeaths",
+    "query_params": [
+      "eventplace",
+      "eventyear",
+      "name",
+      "number_show",
+      "start"
+    ]
+  },
+  "/records/getMarriages.json": {
+    "method": "GET",
+    "operationId": "getMarriages",
+    "query_params": [
+      "eventplace",
+      "eventyear",
+      "name1",
+      "name2",
+      "number_show",
+      "start"
+    ]
+  },
+  "/records/match.json": {
+    "method": "GET",
+    "operationId": "matchRecord",
+    "query_params": [
+      "birthyear",
+      "callback",
+      "lang",
+      "name"
+    ]
+  },
+  "/records/search.json": {
+    "method": "GET",
+    "operationId": "searchRecords",
+    "query_params": [
+      "archive_code",
+      "birthplace",
+      "callback",
+      "country_code",
+      "eventplace",
+      "lang",
+      "name",
+      "number_show",
+      "relationtype",
+      "sort",
+      "sourcetype",
+      "start"
+    ]
+  },
+  "/records/show.json": {
+    "method": "GET",
+    "operationId": "showRecord",
+    "query_params": [
+      "archive",
+      "callback",
+      "identifier",
+      "lang"
+    ]
+  },
+  "/records/yearsago.json": {
+    "method": "GET",
+    "operationId": "getBirthsYearsAgo",
+    "query_params": [
+      "callback",
+      "number_show",
+      "years"
+    ]
+  },
+  "/related/census.json": {
+    "method": "GET",
+    "operationId": "getCensusData",
+    "query_params": [
+      "callback",
+      "gg_uri",
+      "place",
+      "province",
+      "richness",
+      "year"
+    ]
+  },
+  "/related/weather.json": {
+    "method": "GET",
+    "operationId": "getHistoricalWeather",
+    "query_params": [
+      "callback",
+      "date",
+      "lang",
+      "latitude",
+      "longitude"
+    ]
+  },
+  "/stats/archives.json": {
+    "method": "GET",
+    "operationId": "getArchives",
+    "query_params": [
+      "callback"
+    ]
+  },
+  "/stats/breakdown.json": {
+    "method": "GET",
+    "operationId": "getBreakdown",
+    "query_params": [
+      "archive_code",
+      "callback",
+      "eventplace",
+      "eventtype",
+      "group_by",
+      "lang",
+      "min_count",
+      "number_show",
+      "sort",
+      "sourcetype",
+      "year_end",
+      "year_start"
+    ]
+  },
+  "/stats/comments.json": {
+    "method": "GET",
+    "operationId": "getCommentStats",
+    "query_params": [
+      "archive_code",
+      "callback"
+    ]
+  },
+  "/stats/events.json": {
+    "method": "GET",
+    "operationId": "getEventTypeStats",
+    "query_params": [
+      "archive_code",
+      "callback"
+    ]
+  },
+  "/stats/familynames.json": {
+    "method": "GET",
+    "operationId": "getFamilyNameStats",
+    "query_params": [
+      "callback",
+      "eventplace",
+      "eventtype",
+      "eventyearend",
+      "eventyearstart",
+      "lang",
+      "number_show"
+    ]
+  },
+  "/stats/firstnames.json": {
+    "method": "GET",
+    "operationId": "getFirstNameStats",
+    "query_params": [
+      "callback",
+      "eventplace",
+      "eventyear",
+      "number_show"
+    ]
+  },
+  "/stats/professions.json": {
+    "method": "GET",
+    "operationId": "getProfessionStats",
+    "query_params": [
+      "callback",
+      "eventplace",
+      "eventyearend",
+      "eventyearstart",
+      "lang",
+      "number_show"
+    ]
+  },
+  "/stats/records.json": {
+    "method": "GET",
+    "operationId": "getRecordStats",
+    "query_params": [
+      "archive_code",
+      "callback"
+    ]
+  },
+  "/stats/sources.json": {
+    "method": "GET",
+    "operationId": "getSourceTypeStats",
+    "query_params": [
+      "archive_code",
+      "callback"
+    ]
+  },
+  "/transcriptions/browse.json": {
+    "method": "GET",
+    "operationId": "browseTranscriptions",
+    "query_params": [
+      "archive_code",
+      "archive_number",
+      "callback",
+      "lang"
+    ]
+  },
+  "/transcriptions/search.json": {
+    "method": "GET",
+    "operationId": "searchTranscriptions",
+    "query_params": [
+      "archive_code",
+      "archive_number",
+      "callback",
+      "inventory_number",
+      "lang",
+      "number_show",
+      "q",
+      "start",
+      "year_end",
+      "year_start"
+    ]
+  },
+  "/transcriptions/show.json": {
+    "method": "GET",
+    "operationId": "showTranscription",
+    "query_params": [
+      "callback",
+      "id",
+      "lang"
+    ]
+  }
+}

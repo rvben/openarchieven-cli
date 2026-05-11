@@ -50,9 +50,9 @@ fn professions_returns_list_with_filters() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/stats/professions.json"))
-            .and(query_param("place", "Leiden"))
-            .and(query_param("year_start", "1700"))
-            .and(query_param("year_end", "1800"))
+            .and(query_param("eventplace", "Leiden"))
+            .and(query_param("eventyearstart", "1700"))
+            .and(query_param("eventyearend", "1800"))
             .and(query_param("number_show", "20"))
             .and(query_param("lang", "nl"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({

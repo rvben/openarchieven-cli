@@ -2,6 +2,7 @@
         release-patch release-minor release-major \
         release-build release-archive homebrew-formula \
         build-wheel build-sdist publish-crates publish-pypi \
+        openapi-refresh openapi-check \
         test-live clean
 
 check: lint test
@@ -83,6 +84,17 @@ publish-pypi:
 	@if [ -z "$(WHEEL_DIR)" ]; then echo "WHEEL_DIR is required"; exit 1; fi
 	@if [ -z "$(SDIST_DIR)" ]; then echo "SDIST_DIR is required"; exit 1; fi
 	uv tool run twine upload $(WHEEL_DIR)/**/*.whl $(SDIST_DIR)/*.tar.gz
+
+# Pull the latest OpenAPI spec from openarchieven.nl into openapi/ and
+# regenerate the params manifest used by the contract tests. Commit the
+# resulting changes in a single PR.
+openapi-refresh:
+	./scripts/refresh-openapi.py --refresh
+
+# Fail if the vendored spec sha differs from the live one. Used by the
+# weekly cron in .github/workflows/openapi-refresh.yml to open a drift PR.
+openapi-check:
+	./scripts/refresh-openapi.py --check
 
 test-live:
 	OPENARCHIEVEN_TEST_LIVE=1 cargo test --test live -- --nocapture

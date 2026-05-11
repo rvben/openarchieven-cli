@@ -49,7 +49,7 @@ fn yearsago_sends_years_and_limit() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/yearsago.json"))
-            .and(query_param("yearsago", "100"))
+            .and(query_param("years", "100"))
             .and(query_param("number_show", "5"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "response": {"docs": [{"id": "y1"}]}
@@ -139,7 +139,7 @@ fn yearsago_default_limit_is_10() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/yearsago.json"))
-            .and(query_param("yearsago", "50"))
+            .and(query_param("years", "50"))
             .and(query_param("number_show", "10"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "response": {"docs": []}

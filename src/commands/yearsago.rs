@@ -63,7 +63,7 @@ pub fn run(
     let years_s = args.years.to_string();
     let limit_s = limit.to_string();
     let params: Vec<(&str, &str)> = vec![
-        ("yearsago", years_s.as_str()),
+        ("years", years_s.as_str()),
         ("number_show", limit_s.as_str()),
     ];
 

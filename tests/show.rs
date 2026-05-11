@@ -49,7 +49,7 @@ fn show_returns_nested_object() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/show.json"))
-            .and(query_param("archive_code", "elo"))
+            .and(query_param("archive", "elo"))
             .and(query_param("identifier", "abc"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "record": {"id": "abc", "person": {"name": "Jan Jansen"}}
@@ -85,7 +85,7 @@ fn show_404_is_not_found() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/show.json"))
-            .and(query_param("archive_code", "elo"))
+            .and(query_param("archive", "elo"))
             .and(query_param("identifier", "missing"))
             .respond_with(ResponseTemplate::new(404))
             .mount(&server)
@@ -281,7 +281,7 @@ fn show_upstream_invalid_archive_is_not_found() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/show.json"))
-            .and(query_param("archive_code", "ZZZ"))
+            .and(query_param("archive", "ZZZ"))
             .and(query_param("identifier", "12345"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "error_code": 1,

@@ -1,0 +1,3034 @@
+openapi: 3.1.0
+
+info:
+  title: Open Archives API
+  version: "1.1"
+  description: >
+    The Open Archives API provides access to the genealogical dataset of Dutch, Belgian
+    and French archives and associations. It allows searching and retrieving genealogical
+    records, statistical data on archives, source types, event types, family names, first
+    names, professions, as well as related historical data such as weather measurements
+    and Dutch census data. **API calls are throttled per IP address to 4 requests per second**,
+    contact Open Archives to increase this value.
+  contact:
+    name: Coret Genealogie
+    email: api@openarch.nl
+  x-rateLimit:
+    requestsPerSecond: 4
+    scope: ip
+
+servers:
+  - url: https://api.openarchieven.nl/1.1
+    description: Open Archives API server
+
+tags:
+  - name: Records
+    description: Search and retrieve individual genealogical records
+  - name: Stats
+    description: Statistical data about archives, source types, event types, names and professions
+  - name: Related
+    description: Related contextual data such as historical weather and census information
+  - name: Transcriptions
+    description: Search, browse and retrieve transcriptions of historical documents
+
+paths:
+
+  /records/search.json:
+    get:
+      tags:
+        - Records
+      operationId: searchRecords
+      summary: Search genealogical records
+      description: >
+        Searches the genealogical dataset and returns found persons and records.
+        Supports filtering by archive, source type, event place, birth place,
+        relation type and country. Results are pageable and sortable.
+        Note: version 1.1 uses `archive_code` instead of `archive`.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: >
+            Search query. Can include two names separated by `&` and a year or
+            period. See https://www.openarchieven.nl/ for advanced query syntax.
+          schema:
+            type: string
+          example: Coret
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Filter results on a specific archive. Obtain valid archive codes via
+            the Stats/Archives endpoint.
+          schema:
+            type: string
+          example: bhi
+        - name: number_show
+          in: query
+          required: false
+          description: Number of results to return. Maximum is 100.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+          example: 5
+        - name: sourcetype
+          in: query
+          required: false
+          description: >
+            Filter results on source type. Obtain valid source types via the
+            Stats/Sources endpoint.
+          schema:
+            type: string
+          example: "Civil registration marriages"
+        - name: eventplace
+          in: query
+          required: false
+          description: Filter results on event place.
+          schema:
+            type: string
+          example: Amsterdam
+        - name: birthplace
+          in: query
+          required: false
+          description: Filter results on birth place of the person.
+          schema:
+            type: string
+          example: Rotterdam
+        - name: relationtype
+          in: query
+          required: false
+          description: Filter results on relation type (e.g. Bride, Groom, Registered).
+          schema:
+            type: string
+          example: Bride
+        - name: country_code
+          in: query
+          required: false
+          description: "Filter results on country. Available codes: nl, be, fr, sr, etc."
+          schema:
+            type: string
+          example: nl
+        - name: sort
+          in: query
+          required: false
+          description: >
+            Column to sort results on. Use a negative value to sort descending,
+            positive to sort ascending.
+            1=Name, 2=Role, 3=Event, 4=Date, 5=Place, 6=Source.
+          schema:
+            type: integer
+            default: 1
+            enum: [-6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6]
+          example: 4
+        - name: start
+          in: query
+          required: false
+          description: >
+            Initial result offset for paging. Deep pagination is not supported:
+            the maximum allowed value is 10000. Requests with `start` greater
+            than 10000 are rejected with HTTP 400 (error_code 50).
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 10000
+        - name: lang
+          in: query
+          required: false
+          description: >
+            Language code. Affects archive name, sourcetype, relationtype and
+            eventtype labels in the response.
+          schema:
+            type: string
+            enum: [nl, en]
+            default: nl
+          example: en
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful search response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+              example:
+                query:
+                  archive: null
+                  name: Coret
+                  only_results_with_scans: false
+                  start: 0
+                  number_show: 5
+                  sort: 1
+                  language: en
+                response:
+                  number_found: 1060
+                  docs:
+                    - pid: "Person:d930055c-462d-11e3-a747-d206bceb4d38"
+                      identifier: "6b396b55-ffe0-5ccf-a1e0-8330f78157b5"
+                      archive_code: bhi
+                      archive_org: "Brabants Historisch Informatie Centrum"
+                      archive: "Brabant Historical Information Centre"
+                      personname: "2 Coret"
+                      relationtype: Bride
+                      _relationtype: Bruid
+                      eventtype: Marriage
+                      _eventtype: Huwelijk
+                      eventdate:
+                        day: 3
+                        month: 11
+                        year: 1855
+                      eventplace: "'s-Hertogenbosch"
+                      sourcetype: Civil registration marriages
+                      url: "https://www.openarchieven.nl/bhi:6b396b55-ffe0-5ccf-a1e0-8330f78157b5/en"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidArchive:
+                  summary: Invalid archive code
+                  value:
+                    error_code: 1
+                    error_description: Invalid archive
+                invalidLang:
+                  summary: Invalid language code
+                  value:
+                    error_code: 4
+                    error_description: Invalid lang
+                missingName:
+                  summary: Missing required name parameter
+                  value:
+                    error_code: 21
+                    error_description: Missing required name
+                startExceedsMax:
+                  summary: Deep pagination not allowed (start > 10000)
+                  value:
+                    error_code: 50
+                    error_description: Value of start exceeds defined maximum (10000); deep pagination is not supported
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /records/show.json:
+    get:
+      tags:
+        - Records
+      operationId: showRecord
+      summary: Show a single genealogical record
+      description: >
+        Returns one specific genealogical record in JSON format (UTF-8).
+        The response conforms to the Archive 2 All (A2A) model.
+        Also available as XML, GEDCOM, Turtle (TTL) and N-Triples (NT) by
+        changing the file extension in the URL.
+        Note: version 1.1 features improved JSON/XML output and adds N-Triples
+        and Turtle formats.
+      parameters:
+        - name: archive
+          in: query
+          required: true
+          description: >
+            Code of the archive holding the record. Obtain valid archive codes
+            via the Stats/Archives endpoint.
+          schema:
+            type: string
+          example: hua
+        - name: identifier
+          in: query
+          required: true
+          description: Unique identifier (UUID) of the record.
+          schema:
+            type: string
+            format: uuid
+          example: E13B9821-C0B0-4AED-B20B-8DE627ED99BD
+        - name: lang
+          in: query
+          required: false
+          description: >
+            Language code. Affects archive name, sourcetype, relationtype and
+            eventtype labels in the JSON response.
+          schema:
+            type: string
+            enum: [nl, en]
+            default: nl
+          example: en
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A2A model record in JSON format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/A2ARecord"
+              example:
+                Person:
+                  - "@pid": Person2650847486
+                    PersonName:
+                      PersonNameFirstName: Christianus Johannes Jacobus
+                      PersonNameLastName: Elling
+                    Age:
+                      PersonAgeLiteral: "23"
+                    BirthPlace:
+                      Place: Amsterdam
+                    Profession: kleermaker
+                Event:
+                  "@eid": Event1
+                  EventType: Huwelijk
+                  EventDate:
+                    LiteralDate: 06-10-1904
+                    Year: "1904"
+                    Month: "10"
+                    Day: "06"
+                  EventPlace:
+                    Place: Amsterdam
+                RelationEP:
+                  - PersonKeyRef: Person2650847486
+                    EventKeyRef: Event1
+                    RelationType: Bruidegom
+                Source:
+                  SourceType: BS Huwelijk
+                  SourcePlace:
+                    Country: Nederland
+                    Place: Amsterdam
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /records/match.json:
+    get:
+      tags:
+        - Records
+      operationId: matchRecord
+      summary: Match a person to birth and death records
+      description: >
+        Searches the genealogical dataset by exact name and birth year and returns
+        the Open Archives URIs of birth records, death records and registrations
+        in which the person is mentioned.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Full name of the person. No special operators are available.
+          schema:
+            type: string
+          example: Elizabeth Schoolmeester
+        - name: birthyear
+          in: query
+          required: true
+          description: Year of birth as a numerical value.
+          schema:
+            type: integer
+          example: 1818
+        - name: lang
+          in: query
+          required: false
+          description: >
+            Language code. Affects eventtype, sourcetype and archive labels in
+            the response.
+          schema:
+            type: string
+            enum: [nl, en]
+            default: nl
+          example: en
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Match results containing URIs to relevant records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchResponse"
+              example:
+                query:
+                  name: Elizabeth Schoolmeester
+                  birthyear: 1818
+                  lang: en
+                response:
+                  number_found: 2
+                  docs:
+                    - uri: "https://www.openarchieven.nl/zar:242FCD17-6CB7-4D5E-AFED-FD78017E7D6E"
+                      eventtype: Birth
+                      eventplace: Nisse
+                      sourcetype: Civil registration births
+                      archive: Zeeland Archives
+                      archive_code: zar
+                    - uri: "https://www.openarchieven.nl/bor:b58fc802-17c9-a9ab-58d5-061d19489ef4"
+                      eventtype: Birth
+                      eventplace: Nisse
+                      sourcetype: Civil registration births
+                      archive: Municipal Archive Borsele
+                      archive_code: bor
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /records/yearsago.json:
+    get:
+      tags:
+        - Records
+      operationId: getBirthsYearsAgo
+      summary: List births that occurred a specified number of years ago
+      description: >
+        Returns a list of birth records for people born exactly the specified
+        number of years ago from today.
+        Note: version 1.1 uses `archive_code` instead of `archive` and includes
+        the archive name and record URL.
+      parameters:
+        - name: years
+          in: query
+          required: true
+          description: Number of years ago (the date is calculated from today).
+          schema:
+            type: integer
+          example: 200
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of birth records from people born the specified years ago
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/YearsAgoRecord"
+              example:
+                - archive_code: hco
+                  archive: Historisch Centrum Overijssel
+                  identifier: AD23D724-9527-4EE9-AA1A-DAFF91AF9E89
+                  name: Sophia Fredrika van der Vegt
+                  place: "Emmen (Dalfsen)"
+                  scan: 1
+                  url: "https://www.openarchieven.nl/hco:AD23D724-9527-4EE9-AA1A-DAFF91AF9E89"
+                - archive_code: zar
+                  archive: Zeeuws Archief
+                  identifier: DAE34DB7-5EB0-4368-BE41-4067E58CA7C4
+                  name: Pieter Meijers
+                  place: Serooskerke
+                  scan: 1
+                  url: "https://www.openarchieven.nl/zar:DAE34DB7-5EB0-4368-BE41-4067E58CA7C4"
+        "400":
+          description: Invalid parameters
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /records/getBirths.json:
+    get:
+      tags:
+        - Records
+      operationId: getBirths
+      summary: Finds birth records
+      parameters:
+        - name: name
+          in: query
+          description: name of the person on the birth certificate
+          required: true
+          schema:
+            type: string
+        - name: eventyear
+          in: query
+          description: year of birth of the person
+          required: false
+          schema:
+            type: integer
+        - name: eventplace
+          in: query
+          description: place of birth of the person
+          required: false
+          schema:
+            type: string
+        - name: eventprovince
+          in: query
+          description: province in which the birth took place
+          required: false
+          schema:
+            type: string
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: start
+          in: query
+          required: false
+          description: >
+            Initial result offset for paging. Deep pagination is not supported:
+            the maximum allowed value is 10000. Requests with `start` greater
+            than 10000 are rejected with HTTP 400 (error_code 50).
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 10000
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Search2Response'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                startExceedsMax:
+                  summary: Deep pagination not allowed (start > 10000)
+                  value:
+                    error_code: 50
+                    error_description: Value of start exceeds defined maximum (10000); deep pagination is not supported
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /records/getDeaths.json:
+    get:
+      tags:
+        - Records
+      operationId: getDeaths
+      summary: Finds death records
+      parameters:
+        - name: name
+          in: query
+          description: name of the person on the death certificate
+          required: true
+          schema:
+            type: string
+        - name: eventyear
+          in: query
+          description: year of death of the person
+          required: false
+          schema:
+            type: integer
+        - name: eventplace
+          in: query
+          description: place of death of the person
+          required: false
+          schema:
+            type: string
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: start
+          in: query
+          required: false
+          description: >
+            Initial result offset for paging. Deep pagination is not supported:
+            the maximum allowed value is 10000. Requests with `start` greater
+            than 10000 are rejected with HTTP 400 (error_code 50).
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 10000
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Search2Response'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                startExceedsMax:
+                  summary: Deep pagination not allowed (start > 10000)
+                  value:
+                    error_code: 50
+                    error_description: Value of start exceeds defined maximum (10000); deep pagination is not supported
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /records/getMarriages.json:
+    get:
+      tags:
+        - Records
+      operationId: getMarriages
+      summary: Finds marriage records of couples (bride or groom)
+      parameters:
+        - name: name1
+          in: query
+          description: name of the first person (bride or groom) on the marriage certificate
+          required: true
+          schema:
+            type: string
+        - name: name2
+          in: query
+          description: name of the second person (bride or groom) on the marriage certificate
+          required: true
+          schema:
+            type: string
+        - name: eventyear
+          in: query
+          description: year the bride and groom married
+          required: false
+          schema:
+            type: integer
+        - name: eventplace
+          in: query
+          description: place where the  bride and groom were married
+          required: false
+          schema:
+            type: string
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: start
+          in: query
+          required: false
+          description: >
+            Initial result offset for paging. Deep pagination is not supported:
+            the maximum allowed value is 10000. Requests with `start` greater
+            than 10000 are rejected with HTTP 400 (error_code 50).
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 10000
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Search2Response'
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                startExceedsMax:
+                  summary: Deep pagination not allowed (start > 10000)
+                  value:
+                    error_code: 50
+                    error_description: Value of start exceeds defined maximum (10000); deep pagination is not supported
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/archives.json:
+    get:
+      tags:
+        - Stats
+      operationId: getArchives
+      summary: List all archives with statistics
+      description: >
+        Returns an array of all participating archives including their archive code
+        (used in other API calls), name, homepage URL, Twitter handle, ISIL code
+        and search URL on Open Archives.
+        Note: version 1.1 adds ISIL codes and removes defunct ArchiefWiki links.
+      parameters:
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of archive objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Archive"
+              example:
+                - archive_code: ade
+                  isilcode: NL-DtAD
+                  name: Archief Delft
+                  search: "https://www.openarchieven.nl/ade"
+                  homepage: "https://www.stadsarchiefdelft.nl/"
+                  twitter: "https://twitter.com/ArchiefDelft"
+                - archive_code: bhi
+                  isilcode: NL-HtBHIC
+                  name: Brabants Historisch Informatie Centrum
+                  search: "https://www.openarchieven.nl/bhi"
+                  homepage: "https://www.bhic.nl/"
+                  twitter: "https://twitter.com/bhicarchief"
+        "400":
+          description: Invalid parameters
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/records.json:
+    get:
+      tags:
+        - Stats
+      operationId: getRecordStats
+      summary: Record count statistics per archive
+      description: >
+        Returns record count statistics. When no archive is specified, all archives
+        are listed with their total number of records. When an archive code is
+        specified, the source types available for that archive are returned with
+        their individual record counts.
+        Note: version 1.1 uses `archive_code` instead of `archive`.
+      parameters:
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Code of the archive to filter on. Obtain valid codes via the
+            Stats/Archives endpoint.
+          schema:
+            type: string
+          example: elo
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Array of archive record counts. When archive_code is provided,
+            includes a breakdown by source type.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecordStat"
+              examples:
+                allArchives:
+                  summary: All archives (no filter)
+                  value:
+                    - archive_code: ins
+                      archive: "L'Institut national de la statistique et des études économiques (INSEE)"
+                      count: 25146359
+                    - archive_code: saa
+                      archive: Stadsarchief Amsterdam
+                      count: 23309640
+                singleArchive:
+                  summary: Single archive with source type breakdown
+                  value:
+                    - archive_code: elo
+                      archive: Erfgoed Leiden en omstreken
+                      count: 6980046
+                      sourcetypes:
+                        - sourcetype: DTB Dopen
+                          count: 1945558
+                        - sourcetype: BS Overlijden
+                          count: 1166676
+        "400":
+          description: Invalid archive code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: 1
+                error_description: Invalid archive
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/sources.json:
+    get:
+      tags:
+        - Stats
+      operationId: getSourceTypeStats
+      summary: Record count statistics per source type
+      description: >
+        Returns statistics about source types. Without an archive_code all source
+        types across the entire dataset are returned with total record counts.
+        With an archive_code, only source types for that archive are returned.
+        Note: version 1.1 uses `archive_code` instead of `archive`.
+      parameters:
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Code of the archive to filter on. Obtain valid codes via the
+            Stats/Archives endpoint.
+          schema:
+            type: string
+          example: saa
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of source type statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceTypeStat"
+              example:
+                - sourcetype: DTB Dopen
+                  sourcetypelocal: DTB Dopen
+                  sourcetypeenglish: Church records baptisms
+                  count: 1723821
+                - sourcetype: BS Geboorte
+                  sourcetypelocal: BS Geboorte
+                  sourcetypeenglish: Civil registration births
+                  count: 606662
+                - sourcetype: BS Overlijden
+                  sourcetypelocal: BS Overlijden
+                  sourcetypeenglish: Civil registration deaths
+                  count: 604219
+        "400":
+          description: Invalid archive code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: 1
+                error_description: Invalid archive
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/events.json:
+    get:
+      tags:
+        - Stats
+      operationId: getEventTypeStats
+      summary: Record count statistics per event type
+      description: >
+        Returns statistics about event types. Without an archive_code all event
+        types across the entire dataset are returned with total counts. With an
+        archive_code, only event types for that archive are returned.
+        Note: version 1.1 uses `archive_code` instead of `archive`.
+      parameters:
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Code of the archive to filter on. Obtain valid codes via the
+            Stats/Archives endpoint.
+          schema:
+            type: string
+          example: saa
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of event type statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventTypeStat"
+              example:
+                - eventtype: Overlijden
+                  eventtypelocal: Death
+                  eventtypeenglish: Death
+                  count: 75614873
+                - eventtype: Registratie
+                  eventtypelocal: Registration
+                  eventtypeenglish: Registration
+                  count: 53008060
+                - eventtype: Geboorte
+                  eventtypelocal: Birth
+                  eventtypeenglish: Birth
+                  count: 36163126
+                - eventtype: Huwelijk
+                  eventtypelocal: Marriage
+                  eventtypeenglish: Marriage
+                  count: 31184161
+        "400":
+          description: Invalid archive code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: 1
+                error_description: Invalid archive
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/comments.json:
+    get:
+      tags:
+        - Stats
+      operationId: getCommentStats
+      summary: Comment count statistics
+      description: >
+        Returns the total number of validated comments made on records. When no
+        archive_code is provided, the global total is returned. When an archive
+        code is provided, the count for that archive is returned.
+        Note: version 1.1 uses `archive_code` instead of `archive`.
+      parameters:
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Code of the archive to filter on. Obtain valid codes via the
+            Stats/Archives endpoint.
+          schema:
+            type: string
+          example: elo
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comment count, optionally scoped to an archive
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommentStat"
+              examples:
+                global:
+                  summary: Global comment count
+                  value:
+                    - count: 8
+                perArchive:
+                  summary: Comment count for a specific archive
+                  value:
+                    - archive: elo
+                      count: 8
+        "400":
+          description: Invalid archive code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: 1
+                error_description: Invalid archive
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/familynames.json:
+    get:
+      tags:
+        - Stats
+      operationId: getFamilyNameStats
+      summary: Family name frequency statistics
+      description: >
+        Returns the number of times family names appear in events for the selected
+        source types, place and period. Results are ordered by frequency.
+        Open Archives uses this endpoint to power its family name frequency
+        visualisation.
+      parameters:
+        - name: eventplace
+          in: query
+          required: false
+          description: Existing place name to filter on.
+          schema:
+            type: string
+          example: Amsterdam
+        - name: eventyearstart
+          in: query
+          required: false
+          description: Starting year of events to include. Minimum is 1500.
+          schema:
+            type: integer
+            default: 1500
+            minimum: 1500
+            maximum: 1960
+          example: 1800
+        - name: eventyearend
+          in: query
+          required: false
+          description: Ending year of events to include. Maximum is 1960.
+          schema:
+            type: integer
+            default: 1960
+            minimum: 1500
+            maximum: 1960
+          example: 1900
+        - name: eventtype
+          in: query
+          required: false
+          description: >
+            Numeric value for the event type to filter on.
+            0=All types, 1=Christening and birth records, 2=Marriage records,
+            3=Burial and death records, 6=Notarial deeds.
+          schema:
+            type: integer
+            default: 0
+            enum: [0, 1, 2, 3, 6]
+          example: 2
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: lang
+          in: query
+          required: false
+          description: Language code for data labels.
+          schema:
+            type: string
+            enum: [nl, en, de, fr]
+            default: nl
+          example: en
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Google DataTable-style response with family name frequency data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataTableResponse"
+              example:
+                cols:
+                  - id: ""
+                    label: Familienaam
+                    type: string
+                  - id: ""
+                    label: Aantal persoonsvermeldingen
+                    type: number
+                rows:
+                  - c:
+                      - v: Van Leeuwen
+                      - v: 21700
+                  - c:
+                      - v: Van den Berg
+                      - v: 14060
+                  - c:
+                      - v: Smit
+                      - v: 10229
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidLang:
+                  value: { error_code: 4, error_description: Invalid lang }
+                invalidNumberShow:
+                  value: { error_code: 10, error_description: Invalid number_show }
+                numberShowExceedsMax:
+                  value: { error_code: 23, error_description: Value of number_show exceeds defined maximum }
+                eventyearstartExceedsMax:
+                  value: { error_code: 24, error_description: Value of eventyearstart exceeds defined maximum }
+                eventyearstartBelowMin:
+                  value: { error_code: 25, error_description: Value of eventyearstart is below defined minimum }
+                eventyearendExceedsMax:
+                  value: { error_code: 26, error_description: Value of eventyearend exceeds defined maximum }
+                eventyearendBelowMin:
+                  value: { error_code: 27, error_description: Value of eventyearend is below defined minimum }
+                invalidEventtype:
+                  value: { error_code: 28, error_description: Invalid eventype }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/firstnames.json:
+    get:
+      tags:
+        - Stats
+      operationId: getFirstNameStats
+      summary: First name frequency statistics for a given place and year
+      description: >
+        Returns the top-X list of first names in the specified place and year.
+        When a person has multiple forenames, only the first is counted.
+        Currently only Amsterdam is available as a place.
+      parameters:
+        - name: eventplace
+          in: query
+          required: true
+          description: >
+            Existing place name. Currently only `Amsterdam` is available.
+          schema:
+            type: string
+            default: Amsterdam
+          example: Amsterdam
+        - name: eventyear
+          in: query
+          required: true
+          description: The year of events to include. Must be between 1600 and 1960.
+          schema:
+            type: integer
+            minimum: 1600
+            maximum: 1960
+          example: 1720
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Request echo and map of first name to occurrence count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstNamesResponse"
+              example:
+                request:
+                  eventplace: Amsterdam
+                  eventyear: 1720
+                  number_show: 10
+                response:
+                  firstnames:
+                    Anna: 248
+                    Jan: 232
+                    Maria: 229
+                    Johannes: 187
+                    Pieter: 147
+                    Johanna: 135
+                    Catharina: 114
+                    Joannes: 109
+                    Jacob: 88
+                    Jacobus: 81
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidLang:
+                  value: { error_code: 4, error_description: Invalid lang }
+                invalidNumberShow:
+                  value: { error_code: 10, error_description: Invalid number_show }
+                numberShowExceedsMax:
+                  value: { error_code: 23, error_description: Value of number_show exceeds defined maximum }
+                invalidEventyear:
+                  value: { error_code: 43, error_description: "Value of eventyear is below defined minimum (1600) or above defined maximum (1960)" }
+                missingEventyear:
+                  value: { error_code: 44, error_description: Missing eventyear }
+                missingEventplace:
+                  value: { error_code: 45, error_description: Missing eventplace }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/professions.json:
+    get:
+      tags:
+        - Stats
+      operationId: getProfessionStats
+      summary: Profession frequency statistics
+      description: >
+        Returns the number of times professions appear in records for the selected
+        period and place. Results are ordered by frequency. Open Archives uses
+        this endpoint to power its profession frequency visualisation.
+      parameters:
+        - name: eventplace
+          in: query
+          required: false
+          description: Existing place name to filter on.
+          schema:
+            type: string
+          example: Amsterdam
+        - name: eventyearstart
+          in: query
+          required: false
+          description: Starting year of events to include. Minimum is 1500.
+          schema:
+            type: integer
+            default: 1500
+            minimum: 1500
+            maximum: 1960
+          example: 1800
+        - name: eventyearend
+          in: query
+          required: false
+          description: Ending year of events to include. Maximum is 1960.
+          schema:
+            type: integer
+            default: 1960
+            minimum: 1500
+            maximum: 1960
+          example: 1900
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of results per page to return.
+          schema:
+            type: integer
+            default: 100
+        - name: lang
+          in: query
+          required: false
+          description: Language code for data labels.
+          schema:
+            type: string
+            enum: [nl, en, de, fr]
+            default: nl
+          example: en
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Google DataTable-style response with profession frequency data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataTableResponse"
+              example:
+                cols:
+                  - id: ""
+                    label: Profession
+                    type: string
+                  - id: ""
+                    label: Number of individual entries
+                    type: number
+                rows:
+                  - c:
+                      - v: zonder beroep
+                      - v: 16193
+                  - c:
+                      - v: arbeider
+                      - v: 2239
+                  - c:
+                      - v: dienstbode
+                      - v: 982
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidLang:
+                  value: { error_code: 4, error_description: Invalid lang }
+                invalidNumberShow:
+                  value: { error_code: 10, error_description: Invalid number_show }
+                numberShowExceedsMax:
+                  value: { error_code: 23, error_description: Value of number_show exceeds defined maximum }
+                eventyearstartExceedsMax:
+                  value: { error_code: 24, error_description: Value of eventyearstart exceeds defined maximum }
+                eventyearstartBelowMin:
+                  value: { error_code: 25, error_description: Value of eventyearstart is below defined minimum }
+                eventyearendExceedsMax:
+                  value: { error_code: 26, error_description: Value of eventyearend exceeds defined maximum }
+                eventyearendBelowMin:
+                  value: { error_code: 27, error_description: Value of eventyearend is below defined minimum }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /stats/breakdown.json:
+    get:
+      tags:
+        - Stats
+      operationId: getBreakdown
+      summary: Cross-tabulation aggregation grouped by one dimension
+      description: >
+        Returns record counts filtered by any combination of archive, source
+        type, event type, event place and year range, grouped by ONE chosen
+        dimension (archive, sourcetype, eventtype, place or year). Use this
+        endpoint to answer questions such as "how many Bidprentjes per
+        archive?" or "how many marriages per year in Amsterdam?". The response
+        includes the total filtered record count, the total number of distinct
+        groups (capped at 750) and the top-N groups according to the chosen
+        sort.
+      parameters:
+        - name: group_by
+          in: query
+          required: true
+          description: Dimension to aggregate on.
+          schema:
+            type: string
+            enum: [archive, sourcetype, eventtype, place, year]
+          example: archive
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Archive code to filter on. Prefix with `!` to negate
+            (e.g. `!saa` excludes Stadsarchief Amsterdam).
+          schema:
+            type: string
+          example: elo
+        - name: sourcetype
+          in: query
+          required: false
+          description: >
+            Source type to filter on. Multiple source types can be combined
+            with ` & ` (space, ampersand, space), matching the convention of
+            `/records/search.json`.
+          schema:
+            type: string
+          example: Bidprentjesverzameling
+        - name: eventtype
+          in: query
+          required: false
+          description: >
+            Event type filter. 0=all, 1=Birth/Christening, 2=Marriage,
+            3=Death/Burial, 6=Notarial deeds (matches the mapping used by
+            `/stats/familynames.json`).
+          schema:
+            type: integer
+            enum: [0, 1, 2, 3, 6]
+          example: 2
+        - name: eventplace
+          in: query
+          required: false
+          description: Event place to filter on (exact match).
+          schema:
+            type: string
+          example: Amsterdam
+        - name: year_start
+          in: query
+          required: false
+          description: Starting year of events to include. Minimum 1500. Alias `eventyearstart` is also accepted.
+          schema:
+            type: integer
+            default: 1500
+            minimum: 1500
+            maximum: 1960
+          example: 1700
+        - name: year_end
+          in: query
+          required: false
+          description: Ending year of events to include. Maximum 1960. Alias `eventyearend` is also accepted.
+          schema:
+            type: integer
+            default: 1960
+            minimum: 1500
+            maximum: 1960
+          example: 1811
+        - name: min_count
+          in: query
+          required: false
+          description: Exclude groups with fewer records than this threshold.
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 10
+        - name: number_show
+          in: query
+          required: false
+          description: Maximum number of groups returned. Maximum is 500.
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+          example: 100
+        - name: sort
+          in: query
+          required: false
+          description: >
+            Order of the returned groups. `count_desc` (default) and
+            `count_asc` sort by count; `name_asc` sorts alphabetically by
+            `key` (raw facet value).
+          schema:
+            type: string
+            enum: [count_desc, count_asc, name_asc]
+            default: count_desc
+        - name: lang
+          in: query
+          required: false
+          description: >
+            Language for human-readable labels (sourcetype and eventtype
+            groups only). Only `nl` and `en` produce localised labels; `de`
+            and `fr` are accepted but currently fall back to Dutch.
+          schema:
+            type: string
+            enum: [nl, en, de, fr]
+            default: nl
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cross-tabulation breakdown.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BreakdownResponse"
+              example:
+                group_by: archive
+                filters:
+                  sourcetype: Bidprentjesverzameling
+                total_records: 2991005
+                total_groups: 47
+                results:
+                  - key: hwh
+                    label: Heemkundekring Weerderheem
+                    count: 201236
+                  - key: bhi
+                    label: Brabants Historisch Informatie Centrum
+                    count: 187543
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingGroupBy:
+                  value: { error_code: 47, error_description: Missing required group_by }
+                invalidGroupBy:
+                  value: { error_code: 46, error_description: Invalid group_by }
+                invalidSort:
+                  value: { error_code: 48, error_description: Invalid sort }
+                invalidMinCount:
+                  value: { error_code: 49, error_description: Invalid min_count }
+                invalidArchive:
+                  value: { error_code: 1, error_description: Invalid archive }
+                invalidLang:
+                  value: { error_code: 4, error_description: Invalid lang }
+                numberShowExceedsMax:
+                  value: { error_code: 23, error_description: Value of number_show exceeds defined maximum }
+                yearStartBelowMin:
+                  value: { error_code: 25, error_description: Value of eventyearstart is below defined minimum }
+                yearEndExceedsMax:
+                  value: { error_code: 26, error_description: Value of eventyearend exceeds defined maximum }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /related/weather.json:
+    get:
+      tags:
+        - Related
+      operationId: getHistoricalWeather
+      summary: Historical weather measurements for a date and location
+      description: >
+        Returns historical weather measurements from the nearest Dutch weather
+        station for the specified date and coordinates.
+        Data sources are the Royal Netherlands Meteorological Institute (KNMI):
+        measurements 1701–1905 and 1901–2014.
+        Note: this endpoint exposes several types of historical datasets, so
+        measurement types and units can vary between records.
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Date in `YYYY-MM-DD` format.
+          schema:
+            type: string
+            format: date
+          example: "1748-12-06"
+        - name: longitude
+          in: query
+          required: true
+          description: Longitude used to find the nearest weather station (e.g. 52.1).
+          schema:
+            type: number
+            format: float
+          example: 52.1
+        - name: latitude
+          in: query
+          required: true
+          description: Latitude used to find the nearest weather station (e.g. 4.3).
+          schema:
+            type: number
+            format: float
+          example: 4.3
+        - name: lang
+          in: query
+          required: false
+          description: Language code for data labels.
+          schema:
+            type: string
+            enum: [nl, en]
+            default: nl
+          example: en
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Array of weather measurement objects. Each object represents
+            one measurement set from the nearest station. Fields have a `value`
+            and optionally a `decoded` or `label` sub-field.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WeatherMeasurement"
+              example:
+                - WW:
+                    value: GEHBET
+                    decoded: geheel betrokken
+                  T:
+                    value: 88.8888888889
+                  P:
+                    value: "29111"
+                  rijnland: 1
+                  DD:
+                    value: WTN
+                  YYYYMMDD:
+                    value: "17481206"
+                  STN_LOC:
+                    longitude: 52.38
+                    latitude: 4.73
+                  M:
+                    value: "1"
+                  FH:
+                    value: "20"
+                  STN:
+                    value: "42"
+                  STN_URL:
+                    value: "http://www.knmi.nl/klimatologie/metadata/042_zwanenburg.html"
+                    label: URL meer informatie over weerstation
+                  STN_PLACE:
+                    value: Zwanenburg
+                    label: Plaats
+        "400":
+          description: Invalid or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidLang:
+                  value: { error_code: 4, error_description: Invalid lang }
+                invalidDateSyntax:
+                  value: { error_code: 29, error_description: "Invalid date (syntax)" }
+                missingDate:
+                  value: { error_code: 30, error_description: Missing date }
+                invalidLongitudeSyntax:
+                  value: { error_code: 31, error_description: "Invalid longitude (syntax)" }
+                missingLongitude:
+                  value: { error_code: 32, error_description: Missing longitude }
+                invalidLatitudeSyntax:
+                  value: { error_code: 33, error_description: "Invalid latitude (syntax)" }
+                missingLatitude:
+                  value: { error_code: 34, error_description: Missing latitude }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /related/census.json:
+    get:
+      tags:
+        - Related
+      operationId: getCensusData
+      summary: Dutch census data for a place and year
+      description: >
+        Retrieves census data for a Dutch place or municipality for the census
+        year nearest to the specified year.
+        Available census years: 1795, 1830, 1840, 1849, 1859, 1869, 1879, 1889, 1899.
+        Data sources: Volkstellingen.nl (DANS) and Gemeentegeschiedenis.nl.
+        Either `place` or `gg_uri` must be provided.
+      parameters:
+        - name: year
+          in: query
+          required: true
+          description: >
+            A year between 1770 and 1980 (inclusive). The nearest available census
+            year will be selected automatically.
+          schema:
+            type: integer
+            minimum: 1770
+            maximum: 1980
+          example: 1840
+        - name: place
+          in: query
+          required: false
+          description: >
+            Name of the place (case-insensitive). If both `place` and `gg_uri`
+            are provided, only `gg_uri` is used. Either `place` or `gg_uri`
+            is required.
+          schema:
+            type: string
+          example: leiden
+        - name: province
+          in: query
+          required: false
+          description: >
+            Name of the province (case-sensitive) to narrow down place searches.
+            Note: province names are stored as they were at census time, e.g.
+            `Holland`, `Bataafsch Braband`, `Vriesland`.
+          schema:
+            type: string
+          example: Zuid-Holland
+        - name: gg_uri
+          in: query
+          required: false
+          description: >
+            Gemeentegeschiedenis URI (case-sensitive) for the municipality,
+            e.g. `http://www.gemeentegeschiedenis.nl/gemeentenaam/Leiden`.
+            Either `place` or `gg_uri` is required. Approximately 85% of places
+            have been mapped to a Gemeentegeschiedenis URI.
+          schema:
+            type: string
+            format: uri
+          example: "http://www.gemeentegeschiedenis.nl/gemeentenaam/Leiden"
+        - name: richness
+          in: query
+          required: false
+          description: >
+            Level of detail in the response.
+            1=basic information and population number only,
+            2=like 1 plus all available census data,
+            3=like 2 plus aggregated data per province.
+          schema:
+            type: integer
+            default: 1
+            enum: [1, 2, 3]
+          example: 3
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Census data for up to 10 places plus optional provincial totals.
+            Column fieldnames are prefixed with their original column number to
+            preserve the original ordering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CensusResponse"
+              example:
+                census:
+                  - population: 37464
+                    gg_uri: "http://www.gemeentegeschiedenis.nl/gemeentenaam/Leiden"
+                    name: Leiden
+                    province: Zuid-Holland
+                    year: 1840
+                    table:
+                      "02 huizen": 6300
+                      "03 huisgezinnen": 7859
+                      "04 ongehuwde mannen": 11085
+                      "05 gehuwde mannen": 5943
+                      "06 weduwnaars": 578
+                      "07 mannen": 17606
+                      "08 ongehuwde vrouwen": 11943
+                      "09 gehuwde vrouwen": 6034
+                      "10 weduwen": 1881
+                      "11 vrouwen": 19858
+                      "12 inwoners": 37464
+                totals:
+                  Noord-Braband: 378437
+                  Gelderland: 345762
+                  Zuid-Holland: 526020
+                  Noord-Holland: 443334
+        "400":
+          description: Invalid or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidYear:
+                  value: { error_code: 35, error_description: "Invalid year (>=1770 and =<1980)" }
+                missingYear:
+                  value: { error_code: 36, error_description: Missing required year }
+                missingPlaceOrUri:
+                  value: { error_code: 37, error_description: Missing required place or gg_uri }
+                invalidGgUri:
+                  value: { error_code: 38, error_description: "Invalid gg_uri (should start with http://www.gemeentegeschiedenis.nl/gemeentenaam/)" }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /transcriptions/search.json:
+    get:
+      tags:
+        - Transcriptions
+      operationId: searchTranscriptions
+      summary: Full-text search across page transcriptions
+      description: >
+        Performs a full-text search across the page transcriptions of historical
+        documents indexed by Open Archives. Mirrors the search UI at
+        `/transcripties/zoek.php`. Results are ordered by Elasticsearch
+        relevance (the order is fixed and cannot be overridden) and are
+        returned paginated. Each match includes a source citation, page
+        identifier and up to five highlighted text fragments. The set of
+        facets returned depends on the supplied filters.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: >
+            Search query. Wrap in double quotes for an exact phrase match;
+            include `*` or `?` for wildcard matching; otherwise the words are
+            combined with an `AND` operator. Special characters
+            `[ ] ( ) { } ^ + = ! ~ : - /` are stripped before searching.
+          schema:
+            type: string
+          example: coret
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            Filter results to one source archive. Use the openarch archive
+            code (e.g. `utr`, `sch`); the API maps this to the corresponding
+            ISIL internally. Obtain valid codes via Stats/Archives.
+          schema:
+            type: string
+          example: hua
+        - name: archive_number
+          in: query
+          required: false
+          description: >
+            Filter results to one archive number (archieftoegang) within the
+            chosen `archive_code`. Only meaningful when `archive_code` is
+            also supplied.
+          schema:
+            type: string
+          example: "67"
+        - name: inventory_number
+          in: query
+          required: false
+          description: >
+            Filter results to one inventory number within the chosen
+            `archive_number`. Only meaningful when both `archive_code` and
+            `archive_number` are also supplied.
+          schema:
+            type: string
+        - name: year_start
+          in: query
+          required: false
+          description: >
+            Filter on the start year (`inventaris.jaar_van`) of the
+            inventory the page belongs to. Pages themselves carry no date.
+          schema:
+            type: integer
+          example: 1700
+        - name: year_end
+          in: query
+          required: false
+          description: Filter on the end year of the inventory the page belongs to.
+          schema:
+            type: integer
+          example: 1750
+        - name: number_show
+          in: query
+          required: false
+          description: Number of results to return per page. Maximum is 100.
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+          example: 5
+        - name: start
+          in: query
+          required: false
+          description: Result offset for paging.
+          schema:
+            type: integer
+            default: 0
+        - name: lang
+          in: query
+          required: false
+          description: Language code used to localise archive names in the response.
+          schema:
+            type: string
+            enum: [nl, en, de, fr]
+            default: nl
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful search response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionSearchResponse"
+              example:
+                query:
+                  q: coret
+                  archive_code: null
+                  archive_number: null
+                  inventory_number: null
+                  year_start: null
+                  year_end: null
+                  start: 0
+                  number_show: 2
+                  language: en
+                response:
+                  number_found: 1128
+                  docs:
+                    - id: NL-HaNA_1.04.02_8068_0088
+                      uri: https://www.openarchieven.nl/transcripties/toon/NL-HaNA_1.04.02_8068_0088
+                      source_archive:
+                        isil: NL-HaNA
+                        archive_code: rzh
+                        name: Nationaal Archief
+                      archive_number:
+                        nr: "1.04.02"
+                        title: "Inventaris van het archief van de Verenigde Oost-Indische Compagnie (VOC), 1602-1795 (1811)"
+                        url: https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02
+                      inventory_number:
+                        nr: "8068"
+                        title: "Kamer Zeeland, ingekomen stukken … 1692"
+                        url: https://www.nationaalarchief.nl/onderzoeken/archief/1.04.02/invnr/8068
+                      page: "88"
+                      snippets:
+                        - "wel <em>Coret</em> aen sComp. s bediende te koop hebben gebragt"
+                        - "geen <em>Coret</em> meer wisselen"
+                  facets:
+                    source_archive:
+                      - { isil: NL-HaNA,    archive_code: rzh, name: Nationaal Archief, count: 986 }
+                      - { isil: NL-AsdSAA,  archive_code: saa, name: Stadsarchief Amsterdam, count: 74 }
+                      - { isil: NL-HlmNHA,  archive_code: nha, name: Noord-Hollands Archief, count: 25 }
+                      - { isil: NL-UtHUA,   archive_code: hua, name: Het Utrechts Archief, count: 22 }
+        "400":
+          description: Invalid or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingQuery:
+                  value: { error_code: 21, error_description: Missing required name }
+                invalidArchive:
+                  value: { error_code: 1,  error_description: Invalid archive }
+                numberShowOverMax:
+                  value: { error_code: 23, error_description: Value of number_show exceeds defined maximum }
+                missingFormat:
+                  value: { error_code: 15, error_description: Missing required format specification }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /transcriptions/browse.json:
+    get:
+      tags:
+        - Transcriptions
+      operationId: browseTranscriptions
+      summary: Browse transcriptions hierarchically
+      description: >
+        Returns a hierarchical browse of available page transcriptions.
+        Mirrors `/transcripties/lijst/`. Three modes, depending on the
+        supplied filters:
+
+          * No filter — top-level list of source archives ordered by total
+            transcription count (descending).
+          * `archive_code` — list of all archive numbers (archieftoegangen)
+            within that archive, ordered by archive number.
+          * `archive_code` + `archive_number` — list of all inventories
+            within that archive number, ordered by inventory number.
+
+        The order of items is fixed and cannot be overridden. Results are
+        always returned in full (no paging).
+      parameters:
+        - name: archive_code
+          in: query
+          required: false
+          description: >
+            openarch archive code (e.g. `utr`, `sch`). When omitted, the
+            top-level list of source archives is returned.
+          schema:
+            type: string
+          example: hua
+        - name: archive_number
+          in: query
+          required: false
+          description: >
+            Archive number (archieftoegang) within the chosen `archive_code`.
+            Only meaningful when `archive_code` is also supplied.
+          schema:
+            type: string
+          example: "67"
+        - name: lang
+          in: query
+          required: false
+          description: Language code used to localise archive names in the response.
+          schema:
+            type: string
+            enum: [nl, en, de, fr]
+            default: nl
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful browse response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionBrowseResponse"
+              examples:
+                level1:
+                  summary: Top-level list of source archives
+                  value:
+                    filters: { archive_code: null, archive_number: null }
+                    response:
+                      level: 1
+                      docs:
+                        - { isil: NL-HaNA,   archive_code: rzh, name: Nationaal Archief,        count: 15841597 }
+                        - { isil: NL-AsdSAA, archive_code: saa, name: Stadsarchief Amsterdam,   count: 2966344 }
+                        - { isil: NL-HlmNHA, archive_code: nha, name: Noord-Hollands Archief,   count: 2218718 }
+                        - { isil: NL-UtHUA,  archive_code: hua, name: Het Utrechts Archief,     count: 420392 }
+                level2:
+                  summary: Archive numbers within Het Utrechts Archief
+                  value:
+                    filters: { archive_code: hua, archive_number: null }
+                    response:
+                      level: 2
+                      docs:
+                        - nr: "34-4"
+                          title: "Notarissen in de stad Utrecht 1560-1905"
+                          count: 91409
+                          url: https://hetutrechtsarchief.nl/onderzoek/resultaten/archieven?mivast=39&mizig=210&miadt=39&miview=inv2&micode=34-4
+                        - nr: "67"
+                          title: "Inventaris van het archief van de familie Huydecoper 1459-1956 (1997)"
+                          count: 1420
+                          url: https://hetutrechtsarchief.nl/collectie/609C5BA8E8B34642E0534701000A17FD
+                level3:
+                  summary: Inventories within archive number 67 of Het Utrechts Archief
+                  value:
+                    filters: { archive_code: hua, archive_number: "67" }
+                    response:
+                      level: 3
+                      docs:
+                        - nr: "53"
+                          title: "Familie Huydecoper - Joan Huydecoper (1625-1704) - Brieven, uittreksels, dagboekaantekeningen en jaaroverzichten, 1648"
+                          count: 81
+                          url: https://hetutrechtsarchief.nl/collectie/609C5BB0F8244642E0534701000A17FD
+                        - nr: "67"
+                          title: "Familie Huydecoper - Joan Huydecoper (1625-1704) - Dagboek Reis van Bordeaux naar Saumur, 1648"
+                          count: 76
+                          url: https://hetutrechtsarchief.nl/collectie/609C5BB0F8344642E0534701000A17FD
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidArchive:
+                  value: { error_code: 1,  error_description: Invalid archive }
+                missingFormat:
+                  value: { error_code: 15, error_description: Missing required format specification }
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+  /transcriptions/show.json:
+    get:
+      tags:
+        - Transcriptions
+      operationId: showTranscription
+      summary: Retrieve a single transcription
+      description: >
+        Returns the full transcript of a single page along with its source
+        citation. Mirrors `/transcripties/toon/<id>`. AI-generated summaries
+        are deliberately not returned by this endpoint.
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: >
+            Page identifier in the form `<ISIL>_<archive_number>_<page>`,
+            e.g. `NL-SdmGA_1504889_11`.
+          schema:
+            type: string
+          example: NL-SdmGA_1504889_11
+        - name: lang
+          in: query
+          required: false
+          description: Language code used to localise the archive name in the response.
+          schema:
+            type: string
+            enum: [nl, en, de, fr]
+            default: nl
+        - name: callback
+          in: query
+          required: false
+          description: JavaScript function name for JSONP callback.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful transcription response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionResponse"
+              example:
+                id: NL-SdmGA_1504889_11
+                uri: https://www.openarchieven.nl/transcripties/toon/NL-SdmGA_1504889_11
+                source_archive:
+                  isil: NL-SdmGA
+                  archive_code: sch
+                  name: Gemeentearchief Schiedam
+                archive_number:
+                  nr: "243"
+                  title: "Archief van notaris Maarten Kouwenhoven, 1646-1698"
+                  url: https://collecties.schiedam.nl/detail.php?id=7371664
+                inventory_number:
+                  nr: "761"
+                  title: "1662 januari 3-1664 december 30"
+                  url: https://collecties.schiedam.nl/detail.php?nav_id=23-0&id=7371705&name=Detail%20Deelbeschrijving
+                page: "11"
+                source_url: https://archief-schiedam.transkribus.eu/document/1504889/pages/11
+                thumb_url: https://files.transkribus.eu/iiif/2/OJMFZMDTLCEEOLBQFCBRDUDS/full/512,/0/default.jpg
+                project: transkribus
+                transcript: "Bijden Innehoude vanden jegenwoordigen Instrumente sij eenen ijgel. kennel. Ende openbaer dat op huijden den xviije Januarij Ano. xvjc. Tweentsestich voor mij Maerten kouwenhove Openbaer Nots. …"
+        "400":
+          description: Missing or invalid id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingId:
+                  value: { error_code: 12, error_description: Missing required identifier }
+                invalidId:
+                  value: { error_code: 2,  error_description: Invalid identifier (syntax) }
+        "404":
+          description: No transcription with that id was found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: 2
+                error_description: Transcription not found
+        "429":
+          description: Too Many Requests — rate limit of 4 requests per second per IP exceeded.
+
+components:
+  schemas:
+
+    ErrorResponse:
+      type: object
+      description: Standard error response returned by all endpoints.
+      properties:
+        error_code:
+          type: integer
+          description: Numeric error code identifying the error type.
+          examples: [ 4 ]
+        error_description:
+          type: string
+          description: Human-readable description of the error.
+          examples: [ "Invalid lang" ]
+      required:
+        - error_code
+        - error_description
+
+    Archive:
+      type: object
+      description: Information about a participating archive.
+      properties:
+        archive_code:
+          type: string
+          description: Short code used to identify the archive in API calls.
+          examples: [ "ade" ]
+        isilcode:
+          type: string
+          description: International Standard Identifier for Libraries and Related Organizations code.
+          examples: [ "NL-DtAD" ]
+        name:
+          type: string
+          description: Full name of the archive.
+          examples: [ "Archief Delft" ]
+        search:
+          type: string
+          format: uri
+          description: Open Archives search URL scoped to this archive.
+          examples: [ "https://www.openarchieven.nl/ade" ]
+        homepage:
+          type: string
+          format: uri
+          description: Homepage URL of the archive.
+          examples: [ "https://www.stadsarchiefdelft.nl/" ]
+        twitter:
+          type: string
+          format: uri
+          description: Twitter profile URL of the archive.
+          examples: [ "https://twitter.com/ArchiefDelft" ]
+
+    RecordStat:
+      type: object
+      description: Record count for one archive, optionally broken down by source type.
+      properties:
+        archive_code:
+          type: string
+          examples: [ "saa" ]
+        archive:
+          type: string
+          examples: [ "Stadsarchief Amsterdam" ]
+        count:
+          type: integer
+          examples: [ 23309640 ]
+        sourcetypes:
+          type: array
+          description: >
+            Only present when results are scoped to a specific archive.
+          items:
+            type: object
+            properties:
+              sourcetype:
+                type: string
+                examples: [ "DTB Dopen" ]
+              count:
+                type: integer
+                examples: [ 1945558 ]
+
+    SourceTypeStat:
+      type: object
+      description: Record count for a single source type.
+      properties:
+        sourcetype:
+          type: string
+          description: Source type code.
+          examples: [ "DTB Dopen" ]
+        sourcetypelocal:
+          type: string
+          description: Localised source type label.
+          examples: [ "DTB Dopen" ]
+        sourcetypeenglish:
+          type: string
+          description: English source type label.
+          examples: [ "Church records baptisms" ]
+        count:
+          type: integer
+          description: Total number of records for this source type.
+          examples: [ 1723821 ]
+
+    EventTypeStat:
+      type: object
+      description: Record count for a single event type.
+      properties:
+        eventtype:
+          type: string
+          description: Event type code (usually in Dutch).
+          examples: [ "Overlijden" ]
+        eventtypelocal:
+          type: string
+          description: Localised event type label.
+          examples: [ "Death" ]
+        eventtypeenglish:
+          type: string
+          description: English event type label.
+          examples: [ "Death" ]
+        count:
+          type: integer
+          description: Total number of records for this event type.
+          examples: [ 75614873 ]
+
+    BreakdownGroup:
+      type: object
+      description: One group within a breakdown response.
+      properties:
+        key:
+          type: string
+          description: >
+            Raw facet value identifying the group. For `archive` this is the
+            archive_code; for `sourcetype` and `eventtype` it is the Dutch
+            raw value; for `place` it is the place name; for `year` it is
+            the year as a string.
+          examples: [ "hwh" ]
+        label:
+          type: string
+          description: >
+            Human-readable label, localised when `lang` is supplied. Only
+            present for `archive`, `sourcetype` and `eventtype` groupings.
+          examples: [ "Heemkundekring Weerderheem" ]
+        count:
+          type: integer
+          description: Number of records in this group after filters are applied.
+          examples: [ 201236 ]
+      required:
+        - key
+        - count
+
+    BreakdownResponse:
+      type: object
+      description: >
+        Cross-tabulation result returned by `/stats/breakdown.json`. Records
+        matching the supplied filters are aggregated on the dimension chosen
+        by `group_by`.
+      properties:
+        group_by:
+          type: string
+          enum: [archive, sourcetype, eventtype, place, year]
+          description: Dimension on which the results are grouped.
+        filters:
+          type: object
+          description: >
+            Echoes the filter parameters supplied by the caller. Only filters
+            actually present in the request are echoed; defaults are not.
+          additionalProperties: true
+        total_records:
+          type: integer
+          description: Total number of records matching the supplied filters.
+          examples: [ 2991005 ]
+        total_groups:
+          type: integer
+          description: >
+            Total distinct groups matching `min_count`. Capped at 750
+            (the SOLR_FACET_MAX limit). When this equals 750 the true number
+            of groups may be higher.
+          examples: [ 47 ]
+        results:
+          type: array
+          description: Top-N groups according to the chosen sort, truncated to `number_show`.
+          items:
+            $ref: "#/components/schemas/BreakdownGroup"
+      required:
+        - group_by
+        - total_records
+        - total_groups
+        - results
+
+    CommentStat:
+      type: object
+      description: Comment count, optionally scoped to an archive.
+      properties:
+        archive:
+          type: string
+          description: Archive code. Only present when filtered by archive.
+          examples: [ "elo" ]
+        count:
+          type: integer
+          description: Number of validated comments.
+          examples: [ 8 ]
+
+    DataTableResponse:
+      type: object
+      description: >
+        Google DataTable-compatible response format used by the FamilyNames
+        and Professions endpoints.
+      properties:
+        cols:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              type:
+                type: string
+                enum: [string, number]
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              c:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    v:
+                      oneOf:
+                        - type: string
+                        - type: number
+
+    FirstNamesResponse:
+      type: object
+      description: Response for the FirstNames statistics endpoint.
+      properties:
+        request:
+          type: object
+          properties:
+            eventplace:
+              type: string
+            eventyear:
+              type: integer
+            number_show:
+              type: integer
+        response:
+          type: object
+          properties:
+            firstnames:
+              type: object
+              description: Map of first name to occurrence count.
+              additionalProperties:
+                type: integer
+              examples:
+                - Anna: 248
+                  Jan: 232
+
+    SearchQuery:
+      type: object
+      description: Echo of the interpreted search query.
+      properties:
+        archive:
+          type: string
+        name:
+          type: string
+        only_results_with_scans:
+          type: boolean
+        start:
+          type: integer
+        number_show:
+          type: integer
+        sort:
+          type: integer
+        language:
+          enum: [nl, en, de, fr]
+      additionalProperties: true
+
+    SearchDoc:
+      type: object
+      description: A single search result item representing a person mentioned in a record.
+      properties:
+        pid:
+          type: string
+          description: Person identifier.
+        identifier:
+          type: string
+          description: Record UUID.
+        archive_code:
+          type: string
+          description: Archive code.
+        archive_org:
+          type: string
+          description: Name of the archive organisation (Dutch).
+        archive:
+          type: string
+          description: Name of the archive (in the requested language).
+        personname:
+          type: string
+          description: Name of the person as it appears in the record.
+        relationtype:
+          type: string
+          description: Relation type in the requested language.
+        _relationtype:
+          type: string
+          description: Relation type in Dutch.
+        eventtype:
+          type: string
+          description: Event type in the requested language.
+        _eventtype:
+          type: string
+          description: Event type in Dutch.
+        eventdate:
+          type: object
+          nullable: true
+          properties:
+            day:
+              type: integer
+            month:
+              type: integer
+            year:
+              type: integer
+        eventplace:
+          type: [string, "null"]
+          description: Place where the event occurred.
+        sourcetype:
+          type: string
+          description: Type of the source document.
+        url:
+          type: string
+          format: uri
+          description: URL of the record on Open Archives.
+
+    SearchResponse:
+      type: object
+      description: Top-level search response.
+      properties:
+        query:
+          $ref: "#/components/schemas/SearchQuery"
+        response:
+          type: object
+          properties:
+            number_found:
+              type: integer
+              description: Total number of results found.
+              examples: [ 1060 ]
+            docs:
+              type: array
+              items:
+                $ref: "#/components/schemas/SearchDoc"
+
+    MatchDoc:
+      type: object
+      description: A single match result linking a person to a record URI.
+      properties:
+        uri:
+          type: string
+          format: uri
+          description: Open Archives URI for the matching record.
+        eventtype:
+          type: string
+          description: Type of the event in the requested language.
+        eventplace:
+          type: string
+          description: Place where the event occurred.
+        sourcetype:
+          type: string
+          description: Type of the source document.
+        archive:
+          type: string
+          description: Name of the archive in the requested language.
+        archive_code:
+          type: string
+          description: Short archive code.
+
+    MatchResponse:
+      type: object
+      description: Response from the Records/Match endpoint.
+      properties:
+        query:
+          type: object
+          properties:
+            name:
+              type: string
+            birthyear:
+              type: integer
+            lang:
+              type: string
+        response:
+          type: object
+          properties:
+            number_found:
+              type: integer
+            docs:
+              type: array
+              items:
+                $ref: "#/components/schemas/MatchDoc"
+
+    YearsAgoRecord:
+      type: object
+      description: A birth record from a person born a specified number of years ago.
+      properties:
+        archive_code:
+          type: string
+          description: Short archive code.
+          examples: [ hco ]
+        archive:
+          type: string
+          description: Full archive name.
+          examples: [ "Historisch Centrum Overijssel" ]
+        identifier:
+          type: string
+          format: uuid
+          description: Record UUID.
+          examples: [ "AD23D724-9527-4EE9-AA1A-DAFF91AF9E89" ]
+        name:
+          type: string
+          description: Name of the person.
+          examples: [ "Sophia Fredrika van der Vegt" ]
+        place:
+          type: string
+          description: Place of birth.
+          examples: [ "Emmen" ]
+        scan:
+          type: integer
+          description: Indicates whether a scan is available (1=yes, 0=no).
+          enum: [0, 1]
+          examples: [ 1 ]
+        url:
+          type: string
+          format: uri
+          description: URL of the record on Open Archives.
+          examples: [ "https://www.openarchieven.nl/hco:AD23D724-9527-4EE9-AA1A-DAFF91AF9E89" ]
+
+    A2ARecord:
+      type: object
+      description: >
+        A genealogical record in the Archive 2 All (A2A) model format.
+        Field order may differ from the XSD due to hash-based serialisation.
+      properties:
+        Person:
+          type: array
+          items:
+            type: object
+            properties:
+              "@pid":
+                type: string
+              PersonName:
+                type: object
+                properties:
+                  PersonNameFirstName:
+                    type: string
+                  PersonNamePrefixLastName:
+                    type: string
+                  PersonNameLastName:
+                    type: string
+              Age:
+                type: object
+                properties:
+                  PersonAgeLiteral:
+                    type: string
+              BirthPlace:
+                type: object
+                properties:
+                  Place:
+                    type: string
+              Profession:
+                type: string
+        Event:
+          type: object
+          properties:
+            "@eid":
+              type: string
+            EventType:
+              type: string
+            EventDate:
+              type: object
+              properties:
+                LiteralDate:
+                  type: string
+                Year:
+                  type: string
+                Month:
+                  type: string
+                Day:
+                  type: string
+            EventPlace:
+              type: object
+              properties:
+                Place:
+                  type: string
+        RelationEP:
+          type: array
+          items:
+            type: object
+            properties:
+              PersonKeyRef:
+                type: string
+              EventKeyRef:
+                type: string
+              RelationType:
+                type: string
+        Source:
+          type: object
+          properties:
+            SourceType:
+              type: string
+            SourcePlace:
+              type: object
+              properties:
+                Country:
+                  type: string
+                Place:
+                  type: string
+            SourceDate:
+              type: object
+              properties:
+                LiteralDate:
+                  type: string
+                Year:
+                  type: string
+                Month:
+                  type: string
+                Day:
+                  type: string
+            SourceIndexDate:
+              type: object
+              properties:
+                From:
+                  type: string
+                  format: date
+                To:
+                  type: string
+                  format: date
+            SourceReference:
+              type: object
+              additionalProperties: true
+
+    WeatherMeasurement:
+      type: object
+      description: >
+        One set of historical weather measurements from a Dutch KNMI station.
+        The available fields and units vary by dataset (1701–1905 vs 1901–2014).
+      properties:
+        YYYYMMDD:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Date in YYYYMMDD format.
+        STN:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Weather station number.
+        STN_PLACE:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Name of the weather station location.
+            label:
+              type: string
+        STN_URL:
+          type: object
+          properties:
+            value:
+              type: string
+              format: uri
+              description: URL with more information about the weather station.
+            label:
+              type: string
+        STN_LOC:
+          type: object
+          properties:
+            longitude:
+              type: number
+            latitude:
+              type: number
+        M:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Measurement index within the day.
+        WW:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Weather code.
+            decoded:
+              type: string
+              description: Human-readable weather description.
+        T:
+          type: object
+          properties:
+            value:
+              type: number
+              description: Temperature measurement.
+        P:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Air pressure measurement.
+        DD:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Wind direction code.
+        FH:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Wind speed measurement.
+        rijnland:
+          type: integer
+          description: Rijnland indicator flag.
+
+    CensusResponse:
+      type: object
+      description: Census data for matched places plus optional provincial totals.
+      properties:
+        census:
+          type: array
+          description: Up to 10 census records for matching places.
+          items:
+            type: object
+            properties:
+              population:
+                type: integer
+                description: Total population count.
+              gg_uri:
+                type: string
+                format: uri
+                description: Gemeentegeschiedenis URI for the municipality.
+              name:
+                type: string
+                description: Place name.
+              province:
+                type: string
+                description: Province name as recorded in the census.
+              year:
+                type: integer
+                description: Actual census year used.
+              table:
+                type: object
+                description: >
+                  Key-value pairs of census data columns. Column keys are prefixed
+                  with their original column number (e.g. "02 huizen").
+                additionalProperties:
+                  type: integer
+        totals:
+          type: object
+          description: >
+            Aggregated population totals per province. Only present when
+            `richness=3`.
+          additionalProperties:
+            type: integer
+
+    Search2Response:
+      type: object
+      properties:
+        query:
+          $ref: '#/components/schemas/SearchQuery'
+        response:
+          $ref: '#/components/schemas/Search2Results'
+    Search2Results:
+      type: object
+      properties:
+        number_found:
+          type: integer
+          description: total number of search results
+        docs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Search2Result'
+    Search2Result:
+      type: object
+      properties:
+        identifier:
+          type: string
+        archive_code:
+          type: string
+        archive_org:
+          type: string
+        archive:
+          type: string
+        personname:
+          type: string
+        relationtype:
+          type: string
+        _relationtype:
+          type: string
+        eventtype:
+          type: string
+        _eventtype:
+          type: string
+        eventdate:
+          $ref: '#/components/schemas/EventDate'
+        eventplace:
+          type: string
+        sourcetype:
+          type: string
+        url:
+          type: string
+          format: uri
+    EventDate:
+      type: object
+      properties:
+        day:
+          type: integer
+        month:
+          type: integer
+        year:
+          type: integer
+
+    TranscriptionSourceArchive:
+      type: object
+      description: Source archive holding the transcribed page.
+      properties:
+        isil:
+          type: string
+          description: International Standard Identifier for Libraries (ISIL).
+          examples: [ "NL-SdmGA" ]
+        archive_code:
+          type: string
+          nullable: true
+          description: openarch archive code (matches the codes used elsewhere in this API).
+          examples: [ "sch" ]
+        name:
+          type: string
+          nullable: true
+          description: Localised name of the source archive.
+          examples: [ "Gemeentearchief Schiedam" ]
+      required:
+        - isil
+
+    TranscriptionArchiveNumber:
+      type: object
+      description: Archive number (archieftoegang) information for a transcription.
+      properties:
+        nr:
+          type: string
+          description: Archive number as used by the source institution.
+          examples: [ "243" ]
+        title:
+          type: string
+          description: Title of the archive.
+          examples: [ "Archief van notaris Maarten Kouwenhoven, 1646-1698" ]
+        url:
+          type: string
+          format: uri
+          description: External URL describing the archive on the source institution's website.
+      required:
+        - nr
+
+    TranscriptionInventoryNumber:
+      type: object
+      description: Inventory number information for a transcription.
+      properties:
+        nr:
+          type: string
+          examples: [ "761" ]
+        title:
+          type: string
+          examples: [ "1662 januari 3-1664 december 30" ]
+        url:
+          type: string
+          format: uri
+      required:
+        - nr
+
+    TranscriptionMatch:
+      type: object
+      description: One match in a transcription search response.
+      properties:
+        id:
+          type: string
+          description: Page identifier in the form `<ISIL>_<archive_number>_<page>`.
+          examples: [ "NL-SdmGA_1504889_11" ]
+        uri:
+          type: string
+          format: uri
+          description: Open Archives URL where the transcription can be viewed.
+        source_archive:
+          $ref: "#/components/schemas/TranscriptionSourceArchive"
+        archive_number:
+          $ref: "#/components/schemas/TranscriptionArchiveNumber"
+        inventory_number:
+          $ref: "#/components/schemas/TranscriptionInventoryNumber"
+        page:
+          type: string
+          description: Page number with leading zeros stripped.
+          examples: [ "11" ]
+        snippets:
+          type: array
+          description: >
+            Up to five highlighted text fragments showing where the search
+            terms appear. Each fragment wraps the matching terms in
+            `<em>…</em>` tags.
+          items:
+            type: string
+      required:
+        - id
+        - uri
+        - source_archive
+
+    TranscriptionFacetSourceArchive:
+      type: object
+      properties:
+        isil:        { type: string, examples: [ "NL-HaNA" ] }
+        archive_code: { type: string, nullable: true, examples: [ "rzh" ] }
+        name:        { type: string, nullable: true, examples: [ "Nationaal Archief" ] }
+        count:       { type: integer, examples: [ 986 ] }
+
+    TranscriptionFacetNumberedTitle:
+      type: object
+      properties:
+        nr:    { type: string, examples: [ "67" ] }
+        title: { type: string, examples: [ "Inventaris van het archief van de familie Huydecoper" ] }
+        count: { type: integer, examples: [ 1420 ] }
+
+    TranscriptionSearchResponse:
+      type: object
+      description: Response returned by `/transcriptions/search.json`.
+      properties:
+        query:
+          type: object
+          description: Echo of the parameters supplied by the caller.
+          properties:
+            q:                { type: string }
+            archive_code:     { type: string, nullable: true }
+            archive_number:   { type: string, nullable: true }
+            inventory_number: { type: string, nullable: true }
+            year_start:       { type: integer, nullable: true }
+            year_end:         { type: integer, nullable: true }
+            start:            { type: integer }
+            number_show:      { type: integer }
+            language:         { type: string }
+        response:
+          type: object
+          properties:
+            number_found:
+              type: integer
+              description: Total number of matches across all pages.
+            docs:
+              type: array
+              items:
+                $ref: "#/components/schemas/TranscriptionMatch"
+            facets:
+              type: object
+              description: >
+                The set of facets returned depends on the supplied filters.
+                With no `archive_code`: `source_archive`. With `archive_code`
+                only: `archive_number`. With both `archive_code` and
+                `archive_number`: `inventory_number`.
+              properties:
+                source_archive:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TranscriptionFacetSourceArchive"
+                archive_number:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TranscriptionFacetNumberedTitle"
+                inventory_number:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TranscriptionFacetNumberedTitle"
+      required:
+        - query
+        - response
+
+    TranscriptionBrowseLevel1Item:
+      type: object
+      properties:
+        isil:         { type: string, examples: [ "NL-SdmGA" ] }
+        archive_code: { type: string, nullable: true, examples: [ "sch" ] }
+        name:         { type: string, nullable: true, examples: [ "Gemeentearchief Schiedam" ] }
+        count:        { type: integer, examples: [ 299138 ] }
+
+    TranscriptionBrowseNumberedItem:
+      type: object
+      properties:
+        nr:    { type: string }
+        title: { type: string }
+        count: { type: integer }
+        url:
+          type: string
+          format: uri
+          description: External URL describing this archive number or inventory on the source institution's website.
+
+    TranscriptionBrowseResponse:
+      type: object
+      description: Response returned by `/transcriptions/browse.json`.
+      properties:
+        filters:
+          type: object
+          properties:
+            archive_code:   { type: string, nullable: true }
+            archive_number: { type: string, nullable: true }
+        response:
+          type: object
+          properties:
+            level:
+              type: integer
+              enum: [1, 2, 3]
+              description: >
+                Browse depth: 1 = source archives, 2 = archive numbers within
+                an archive, 3 = inventories within an archive number.
+            docs:
+              type: array
+              description: >
+                Item shape depends on `level`. At level 1 each item is a
+                `TranscriptionBrowseLevel1Item`; at levels 2 and 3 each item
+                is a `TranscriptionBrowseNumberedItem`.
+              items:
+                oneOf:
+                  - $ref: "#/components/schemas/TranscriptionBrowseLevel1Item"
+                  - $ref: "#/components/schemas/TranscriptionBrowseNumberedItem"
+      required:
+        - filters
+        - response
+
+    TranscriptionResponse:
+      type: object
+      description: Response returned by `/transcriptions/show.json`.
+      properties:
+        id:
+          type: string
+          description: Page identifier (matches the request `id`).
+          examples: [ "NL-SdmGA_1504889_11" ]
+        uri:
+          type: string
+          format: uri
+        source_archive:
+          $ref: "#/components/schemas/TranscriptionSourceArchive"
+        archive_number:
+          $ref: "#/components/schemas/TranscriptionArchiveNumber"
+        inventory_number:
+          $ref: "#/components/schemas/TranscriptionInventoryNumber"
+        page:
+          type: string
+          description: Page number with leading zeros stripped.
+        source_url:
+          type: string
+          format: uri
+          description: Direct link to the scan or transcription on the source archive's website.
+        thumb_url:
+          type: string
+          format: uri
+          description: Thumbnail image URL, when available.
+        project:
+          type: string
+          description: >
+            Source project that produced the transcription, e.g. `transkribus`,
+            `globalise`, `mibudera`.
+        transcript:
+          type: string
+          description: Plain-text transcript of the page.
+      required:
+        - id
+        - uri
+        - source_archive
+        - transcript

@@ -186,11 +186,7 @@ fn show_dispatch_sends_archive_and_identifier() {
     let env = Env::new();
     env.mount_get_with_params(
         "/records/show.json",
-        &[
-            ("archive_code", "elo"),
-            ("identifier", "abc"),
-            ("lang", "nl"),
-        ],
+        &[("archive", "elo"), ("identifier", "abc"), ("lang", "nl")],
         json!({"record": {"id": "abc", "person": {"name": "Jan"}}}),
     );
     let out = env.cmd().args(["show", "elo", "abc"]).assert().success();
@@ -221,7 +217,7 @@ fn show_upstream_error_envelope_exits_nonzero_with_stderr_error() {
     env.rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/show.json"))
-            .and(query_param("archive_code", "ZZZ"))
+            .and(query_param("archive", "ZZZ"))
             .and(query_param("identifier", "12345"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "error_code": 1,
@@ -256,7 +252,7 @@ fn match_dispatch_sends_name_and_birth_year() {
     let env = Env::new();
     env.mount_get_with_params(
         "/records/match.json",
-        &[("name", "jansen"), ("birth_year", "1900"), ("lang", "nl")],
+        &[("name", "jansen"), ("birthyear", "1900"), ("lang", "nl")],
         json!({
             "response": {"numFound": 1, "docs": [{"id": "m-1", "score": 0.9}]}
         }),
@@ -303,7 +299,7 @@ fn marriages_dispatch_sends_both_partner_names() {
     let env = Env::new();
     env.mount_get_with_params(
         "/records/getMarriages.json",
-        &[("name", "jansen"), ("name2", "pieters")],
+        &[("name1", "jansen"), ("name2", "pieters")],
         json!({"response": {"numFound": 1, "docs": [{"id": "m-1", "groom": "Jan"}]}}),
     );
     let out = env
@@ -320,7 +316,7 @@ fn yearsago_dispatch_sends_years_param() {
     let env = Env::new();
     env.mount_get_with_params(
         "/records/yearsago.json",
-        &[("yearsago", "100"), ("number_show", "10")],
+        &[("years", "100"), ("number_show", "10")],
         json!({"response": {"numFound": 1, "docs": [{"id": "y-1"}]}}),
     );
     let out = env.cmd().args(["yearsago", "100"]).assert().success();
@@ -461,7 +457,7 @@ fn stats_familynames_dispatch_sends_place_param() {
     let env = Env::new();
     env.mount_get_with_params(
         "/stats/familynames.json",
-        &[("place", "Leiden")],
+        &[("eventplace", "Leiden")],
         json!({"familynames": [{"familyname": "Jansen", "count": 1234}]}),
     );
     let out = env
@@ -501,7 +497,7 @@ fn stats_professions_dispatch_sends_place_param() {
     let env = Env::new();
     env.mount_get_with_params(
         "/stats/professions.json",
-        &[("place", "Leiden")],
+        &[("eventplace", "Leiden")],
         json!({"professions": [{"profession": "boer", "count": 500}]}),
     );
     let out = env

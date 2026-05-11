@@ -191,11 +191,11 @@ fn search_sends_optional_filters() {
             .and(path("/records/search.json"))
             .and(query_param("name", "jansen"))
             .and(query_param("archive_code", "elo"))
-            .and(query_param("source_type", "BS"))
-            .and(query_param("event_place", "Amsterdam"))
-            .and(query_param("birth_place", "Leiden"))
-            .and(query_param("relation_type", "vader"))
-            .and(query_param("country", "NL"))
+            .and(query_param("sourcetype", "BS"))
+            .and(query_param("eventplace", "Amsterdam"))
+            .and(query_param("birthplace", "Leiden"))
+            .and(query_param("relationtype", "vader"))
+            .and(query_param("country_code", "NL"))
             .and(query_param("sort", "2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "response": {"numFound": 1, "docs": [{"id": "x"}]}

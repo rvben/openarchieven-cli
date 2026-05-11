@@ -88,13 +88,13 @@ pub fn run(
         ("lang", ctx.lang.as_str()),
     ];
     if let Some(p) = args.place.as_deref() {
-        params.push(("place", p));
+        params.push(("eventplace", p));
     }
     if let Some(s) = ys.as_deref() {
-        params.push(("year_start", s));
+        params.push(("eventyearstart", s));
     }
     if let Some(s) = ye.as_deref() {
-        params.push(("year_end", s));
+        params.push(("eventyearend", s));
     }
 
     let ttl = resolve_ttl(ctx, TtlHint::Fixed(Duration::from_secs(24 * 3600)));

@@ -1,6 +1,5 @@
 ---
 source: tests/schema.rs
-assertion_line: 12
 expression: s
 ---
 {
@@ -879,18 +878,18 @@ expression: s
               "value": 1
             },
             {
-              "description": "Overlijden",
-              "label": "death",
+              "description": "Huwelijk",
+              "label": "marriage",
               "value": 2
             },
             {
-              "description": "Huwelijk",
-              "label": "marriage",
+              "description": "Overlijden",
+              "label": "death",
               "value": 3
             },
             {
-              "description": "Other registrations",
-              "label": "other",
+              "description": "Notariële akten",
+              "label": "notarial",
               "value": 6
             }
           ]
@@ -1059,6 +1058,160 @@ expression: s
         {
           "name": "paginated",
           "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "stats breakdown",
+      "description": "Cross-tabulation aggregation grouped by one dimension.",
+      "mutating": false,
+      "response_shape": "single-nested",
+      "paginated": false,
+      "cache_ttl_seconds": 86400,
+      "cache_ttl_strategy": "fixed",
+      "args": [
+        {
+          "name": "group_by",
+          "type": "string",
+          "required": true,
+          "positional": true,
+          "enum": [
+            "archive",
+            "sourcetype",
+            "eventtype",
+            "place",
+            "year"
+          ]
+        },
+        {
+          "name": "--archive",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--source-type",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--event-type",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "enum": [
+            {
+              "description": "All event types",
+              "label": "all",
+              "value": 0
+            },
+            {
+              "description": "Geboorte",
+              "label": "birth",
+              "value": 1
+            },
+            {
+              "description": "Huwelijk",
+              "label": "marriage",
+              "value": 2
+            },
+            {
+              "description": "Overlijden",
+              "label": "death",
+              "value": 3
+            },
+            {
+              "description": "Notariële akten",
+              "label": "notarial",
+              "value": 6
+            }
+          ]
+        },
+        {
+          "name": "--place",
+          "type": "string",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "--year-start",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1500,
+          "max": 1960
+        },
+        {
+          "name": "--year-end",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1500,
+          "max": 1960
+        },
+        {
+          "name": "--min-count",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "min": 1
+        },
+        {
+          "name": "--sort",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "count_desc",
+          "enum": [
+            "count_desc",
+            "count_asc",
+            "name_asc"
+          ]
+        },
+        {
+          "name": "--limit",
+          "type": "integer",
+          "required": false,
+          "positional": false,
+          "default": 100,
+          "min": 1,
+          "max": 500
+        },
+        {
+          "name": "--lang",
+          "type": "string",
+          "required": false,
+          "positional": false,
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de",
+            "fr"
+          ]
+        }
+      ],
+      "output_fields": [
+        {
+          "name": "group_by",
+          "type": "string"
+        },
+        {
+          "name": "filters",
+          "type": "object"
+        },
+        {
+          "name": "total_records",
+          "type": "integer"
+        },
+        {
+          "name": "total_groups",
+          "type": "integer"
+        },
+        {
+          "name": "results",
+          "type": "array<group>"
         }
       ]
     },

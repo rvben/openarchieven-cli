@@ -126,7 +126,7 @@ fn marriages_sends_both_names() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/getMarriages.json"))
-            .and(query_param("name", "Jan"))
+            .and(query_param("name1", "Jan"))
             .and(query_param("name2", "Anna"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "response": {"numFound": 1, "docs": [{"id": "m1"}]}
@@ -359,7 +359,7 @@ fn marriages_with_event_year_filter() {
     rt.block_on(async {
         Mock::given(method("GET"))
             .and(path("/records/getMarriages.json"))
-            .and(query_param("name", "Jan"))
+            .and(query_param("name1", "Jan"))
             .and(query_param("name2", "Anna"))
             .and(query_param("eventyear", "1900"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
