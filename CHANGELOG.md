@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 
 
 
+
+## [0.4.0](https://github.com/rvben/openarchieven-cli/compare/v0.3.0...v0.4.0) - 2026-05-11
+
+### Added
+
+- agentic output optimizations — compact JSON, ndjson, nested --fields ([0449504](https://github.com/rvben/openarchieven-cli/commit/0449504d0cc81e21d23d06eb7481e743040b0725))
+- **openapi**: vendor spec, add drift check, align params, add stats breakdown ([8ffab03](https://github.com/rvben/openarchieven-cli/commit/8ffab03e3103532babb18f1e7f5d40a4f529b9c4))
+
 ## [0.3.0](https://github.com/rvben/openarchieven-cli/compare/v0.2.1...v0.3.0) - 2026-04-30
 
 ### Added
