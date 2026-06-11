@@ -21,6 +21,8 @@ fn schema_command_list_is_complete() {
     let names: Vec<&str> = s.commands.iter().map(|c| c.name).collect();
 
     let expected = [
+        "archives",
+        "init",
         "search",
         "show",
         "match",
@@ -28,7 +30,6 @@ fn schema_command_list_is_complete() {
         "deaths",
         "marriages",
         "yearsago",
-        "archives",
         "census",
         "weather",
         "stats records",

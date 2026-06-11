@@ -20,6 +20,8 @@ pub enum Format {
     Json,
     Ndjson,
     Table,
+    /// Alias for `Table`; accepted via `-o text` for CLI Spec v0.2 compliance.
+    Text,
     Markdown,
 }
 
@@ -29,6 +31,7 @@ impl Format {
             "json" => Some(Format::Json),
             "ndjson" => Some(Format::Ndjson),
             "table" => Some(Format::Table),
+            "text" => Some(Format::Text),
             "markdown" => Some(Format::Markdown),
             _ => None,
         }
@@ -38,7 +41,7 @@ impl Format {
         match self {
             Format::Json => "json",
             Format::Ndjson => "ndjson",
-            Format::Table => "table",
+            Format::Table | Format::Text => "table",
             Format::Markdown => "markdown",
         }
     }

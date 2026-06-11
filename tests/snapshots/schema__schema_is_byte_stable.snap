@@ -1,6 +1,5 @@
 ---
 source: tests/schema.rs
-assertion_line: 12
 expression: s
 ---
 {
@@ -15,7 +14,101 @@ expression: s
     "json",
     "ndjson",
     "table",
+    "text",
     "markdown"
+  ],
+  "global_args": [
+    {
+      "name": "--output",
+      "short": "-o",
+      "type": "string",
+      "required": false,
+      "description": "Output format: json, ndjson, table, text, markdown"
+    },
+    {
+      "name": "--pretty",
+      "short": null,
+      "type": "bool",
+      "required": false,
+      "description": "Pretty-print JSON output"
+    },
+    {
+      "name": "--quiet",
+      "short": "-q",
+      "type": "bool",
+      "required": false,
+      "description": "Suppress stderr progress output"
+    },
+    {
+      "name": "--no-color",
+      "short": null,
+      "type": "bool",
+      "required": false,
+      "description": "Disable ANSI colors"
+    },
+    {
+      "name": "--no-cache",
+      "short": null,
+      "type": "bool",
+      "required": false,
+      "description": "Bypass cache read and write for this invocation"
+    },
+    {
+      "name": "--refresh",
+      "short": null,
+      "type": "bool",
+      "required": false,
+      "description": "Bypass cache read; still write"
+    },
+    {
+      "name": "--cache-ttl",
+      "short": null,
+      "type": "string",
+      "required": false,
+      "description": "Override cache TTL (e.g. 1h, inf, 0)"
+    },
+    {
+      "name": "--cache-dir",
+      "short": null,
+      "type": "string",
+      "required": false,
+      "description": "Override cache directory"
+    },
+    {
+      "name": "--fields",
+      "short": null,
+      "type": "string",
+      "required": false,
+      "description": "Top-level field projection (comma-separated)"
+    },
+    {
+      "name": "--limit",
+      "short": null,
+      "type": "integer",
+      "required": false,
+      "description": "Pagination limit where supported"
+    },
+    {
+      "name": "--offset",
+      "short": null,
+      "type": "integer",
+      "required": false,
+      "description": "Pagination offset where supported"
+    },
+    {
+      "name": "--lang",
+      "short": null,
+      "type": "string",
+      "required": false,
+      "description": "Response language (default: nl)"
+    },
+    {
+      "name": "--timeout",
+      "short": null,
+      "type": "string",
+      "required": false,
+      "description": "Per-request timeout (e.g. 30s, 1m, 500ms)"
+    }
   ],
   "env_vars": [
     {
@@ -49,6 +142,58 @@ expression: s
     "dir_permissions": "0700"
   },
   "commands": [
+    {
+      "name": "archives",
+      "description": "List all participating archives.",
+      "mutating": false,
+      "response_shape": "list",
+      "paginated": false,
+      "cache_ttl_seconds": 604800,
+      "cache_ttl_strategy": "fixed",
+      "args": [],
+      "output_fields": [
+        {
+          "name": "items",
+          "type": "array<archive>"
+        },
+        {
+          "name": "total",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "null"
+        },
+        {
+          "name": "offset",
+          "type": "null"
+        },
+        {
+          "name": "paginated",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "init",
+      "description": "Verify the tool is installed and ready; exits 0 with a JSON confirmation",
+      "mutating": false,
+      "response_shape": "single-flat",
+      "paginated": false,
+      "cache_ttl_seconds": null,
+      "cache_ttl_strategy": "none",
+      "args": [],
+      "output_fields": [
+        {
+          "name": "initialized",
+          "type": "bool"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ]
+    },
     {
       "name": "search",
       "description": "Free-text record search across all archives.",
@@ -546,38 +691,6 @@ expression: s
         {
           "name": "total",
           "type": "integer"
-        },
-        {
-          "name": "paginated",
-          "type": "boolean"
-        }
-      ]
-    },
-    {
-      "name": "archives",
-      "description": "List all participating archives.",
-      "mutating": false,
-      "response_shape": "list",
-      "paginated": false,
-      "cache_ttl_seconds": 604800,
-      "cache_ttl_strategy": "fixed",
-      "args": [],
-      "output_fields": [
-        {
-          "name": "items",
-          "type": "array<archive>"
-        },
-        {
-          "name": "total",
-          "type": "integer"
-        },
-        {
-          "name": "limit",
-          "type": "null"
-        },
-        {
-          "name": "offset",
-          "type": "null"
         },
         {
           "name": "paginated",

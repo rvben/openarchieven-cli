@@ -43,6 +43,7 @@ impl GlobalArgs {
             FormatArg::Json => Format::Json,
             FormatArg::Ndjson => Format::Ndjson,
             FormatArg::Table => Format::Table,
+            FormatArg::Text => Format::Text,
             FormatArg::Markdown => Format::Markdown,
         });
         let env = std::env::var("OPENARCHIEVEN_OUTPUT").ok();

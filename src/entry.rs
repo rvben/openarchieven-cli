@@ -82,6 +82,15 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 crate::output::render(out, &renderable, global.format, global.pretty)
             })
         }
+        Cmd::Init => {
+            let body =
+                serde_json::json!({ "initialized": true, "version": env!("CARGO_PKG_VERSION") });
+            let renderable = crate::output::Renderable::single_flat(body);
+            crate::output::ensure_format_compatible(&renderable, global.format)?;
+            write_stdout(|out| {
+                crate::output::render(out, &renderable, global.format, global.pretty)
+            })
+        }
         Cmd::Schema => {
             let schema = crate::schema_cmd::build();
             if global.format == crate::tty::Format::Ndjson {

@@ -257,7 +257,7 @@ pub fn render<W: Write>(
     match fmt {
         Format::Json => render_json(out, r, pretty_json),
         Format::Ndjson => render_ndjson(out, r),
-        Format::Table => render_table(out, r),
+        Format::Table | Format::Text => render_table(out, r),
         Format::Markdown => render_markdown(out, r),
     }
 }

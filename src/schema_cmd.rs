@@ -11,10 +11,22 @@ pub struct Schema {
     pub base_url: &'static str,
     pub rate_limit: RateLimit,
     pub output_formats: Vec<&'static str>,
+    pub global_args: Vec<GlobalArg>,
     pub env_vars: Vec<EnvVar>,
     pub cache: CacheInfo,
     pub commands: Vec<Command>,
     pub errors: Vec<ErrorEntry>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct GlobalArg {
+    pub name: &'static str,
+    pub short: Option<&'static str>,
+    #[serde(rename = "type")]
+    pub ty: &'static str,
+    pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<&'static str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -90,7 +102,8 @@ pub fn build() -> Schema {
             requests_per_second: 4,
             scope: "per_ip",
         },
-        output_formats: vec!["json", "ndjson", "table", "markdown"],
+        output_formats: vec!["json", "ndjson", "table", "text", "markdown"],
+        global_args: global_args(),
         env_vars: vec![
             EnvVar {
                 name: "OPENARCHIEVEN_BASE_URL",
@@ -180,8 +193,106 @@ fn errors() -> Vec<ErrorEntry> {
     ]
 }
 
+fn global_args() -> Vec<GlobalArg> {
+    vec![
+        GlobalArg {
+            name: "--output",
+            short: Some("-o"),
+            ty: "string",
+            required: false,
+            description: Some("Output format: json, ndjson, table, text, markdown"),
+        },
+        GlobalArg {
+            name: "--pretty",
+            short: None,
+            ty: "bool",
+            required: false,
+            description: Some("Pretty-print JSON output"),
+        },
+        GlobalArg {
+            name: "--quiet",
+            short: Some("-q"),
+            ty: "bool",
+            required: false,
+            description: Some("Suppress stderr progress output"),
+        },
+        GlobalArg {
+            name: "--no-color",
+            short: None,
+            ty: "bool",
+            required: false,
+            description: Some("Disable ANSI colors"),
+        },
+        GlobalArg {
+            name: "--no-cache",
+            short: None,
+            ty: "bool",
+            required: false,
+            description: Some("Bypass cache read and write for this invocation"),
+        },
+        GlobalArg {
+            name: "--refresh",
+            short: None,
+            ty: "bool",
+            required: false,
+            description: Some("Bypass cache read; still write"),
+        },
+        GlobalArg {
+            name: "--cache-ttl",
+            short: None,
+            ty: "string",
+            required: false,
+            description: Some("Override cache TTL (e.g. 1h, inf, 0)"),
+        },
+        GlobalArg {
+            name: "--cache-dir",
+            short: None,
+            ty: "string",
+            required: false,
+            description: Some("Override cache directory"),
+        },
+        GlobalArg {
+            name: "--fields",
+            short: None,
+            ty: "string",
+            required: false,
+            description: Some("Top-level field projection (comma-separated)"),
+        },
+        GlobalArg {
+            name: "--limit",
+            short: None,
+            ty: "integer",
+            required: false,
+            description: Some("Pagination limit where supported"),
+        },
+        GlobalArg {
+            name: "--offset",
+            short: None,
+            ty: "integer",
+            required: false,
+            description: Some("Pagination offset where supported"),
+        },
+        GlobalArg {
+            name: "--lang",
+            short: None,
+            ty: "string",
+            required: false,
+            description: Some("Response language (default: nl)"),
+        },
+        GlobalArg {
+            name: "--timeout",
+            short: None,
+            ty: "string",
+            required: false,
+            description: Some("Per-request timeout (e.g. 30s, 1m, 500ms)"),
+        },
+    ]
+}
+
 fn commands() -> Vec<Command> {
     vec![
+        crate::commands::archives::schema(),
+        init_self(),
         crate::commands::search::schema(),
         crate::commands::show::schema(),
         crate::commands::match_record::schema(),
@@ -189,7 +300,6 @@ fn commands() -> Vec<Command> {
         crate::commands::deaths::schema(),
         crate::commands::marriages::schema(),
         crate::commands::yearsago::schema(),
-        crate::commands::archives::schema(),
         crate::commands::census::schema(),
         crate::commands::weather::schema(),
         crate::commands::stats::records::schema(),
@@ -209,6 +319,29 @@ fn commands() -> Vec<Command> {
         schema_self(),
         version_self(),
     ]
+}
+
+fn init_self() -> Command {
+    Command {
+        name: "init",
+        description: "Verify the tool is installed and ready; exits 0 with a JSON confirmation",
+        mutating: false,
+        response_shape: "single-flat",
+        paginated: false,
+        cache_ttl_seconds: None,
+        cache_ttl_strategy: "none",
+        args: vec![],
+        output_fields: vec![
+            OutputField {
+                name: "initialized",
+                ty: "bool",
+            },
+            OutputField {
+                name: "version",
+                ty: "string",
+            },
+        ],
+    }
 }
 
 fn schema_self() -> Command {
@@ -252,17 +385,31 @@ mod tests {
     }
 
     #[test]
-    fn build_emits_four_output_formats() {
+    fn build_emits_five_output_formats() {
         let s = build();
         assert_eq!(
             s.output_formats,
-            vec!["json", "ndjson", "table", "markdown"]
+            vec!["json", "ndjson", "table", "text", "markdown"]
         );
     }
 
     #[test]
-    fn build_emits_twentysix_commands() {
-        // 18 API/CLI commands + 3 transcripts subcommands + cache info/clear/prune + schema + version.
-        assert_eq!(build().commands.len(), 26);
+    fn build_emits_twentyseven_commands() {
+        // archives + init + 17 API commands + 3 transcripts subcommands + cache info/clear/prune + schema + version.
+        assert_eq!(build().commands.len(), 27);
+    }
+
+    #[test]
+    fn archives_is_first_command() {
+        let s = build();
+        assert_eq!(s.commands[0].name, "archives");
+    }
+
+    #[test]
+    fn global_args_declared() {
+        let s = build();
+        assert!(!s.global_args.is_empty());
+        assert!(s.global_args.iter().any(|a| a.name == "--output"));
+        assert!(s.global_args.iter().any(|a| a.name == "--quiet"));
     }
 }
