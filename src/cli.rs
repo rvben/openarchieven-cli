@@ -20,8 +20,7 @@ pub enum FormatArg {
     version,
     about = "Agent-friendly CLI for the openarchieven.nl Dutch genealogical API",
     propagate_version = true,
-    disable_help_subcommand = true,
-    after_help = "Run 'openarchieven cache clear --yes' to wipe the cache without a confirmation prompt."
+    disable_help_subcommand = true
 )]
 pub struct Cli {
     /// Output format. Defaults: TTY → table, pipe → json. `ndjson` is only valid for list responses.
@@ -82,9 +81,6 @@ pub enum Cmd {
     /// Cache management.
     #[command(subcommand)]
     Cache(CacheCmd),
-
-    /// Verify the tool is installed and ready; exits 0 with a JSON confirmation.
-    Init,
 
     /// Print the machine-readable schema.
     Schema,

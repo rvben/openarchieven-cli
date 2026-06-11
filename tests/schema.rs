@@ -22,7 +22,6 @@ fn schema_command_list_is_complete() {
 
     let expected = [
         "archives",
-        "init",
         "search",
         "show",
         "match",

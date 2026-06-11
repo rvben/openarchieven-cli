@@ -292,7 +292,6 @@ fn global_args() -> Vec<GlobalArg> {
 fn commands() -> Vec<Command> {
     vec![
         crate::commands::archives::schema(),
-        init_self(),
         crate::commands::search::schema(),
         crate::commands::show::schema(),
         crate::commands::match_record::schema(),
@@ -319,29 +318,6 @@ fn commands() -> Vec<Command> {
         schema_self(),
         version_self(),
     ]
-}
-
-fn init_self() -> Command {
-    Command {
-        name: "init",
-        description: "Verify the tool is installed and ready; exits 0 with a JSON confirmation",
-        mutating: false,
-        response_shape: "single-flat",
-        paginated: false,
-        cache_ttl_seconds: None,
-        cache_ttl_strategy: "none",
-        args: vec![],
-        output_fields: vec![
-            OutputField {
-                name: "initialized",
-                ty: "bool",
-            },
-            OutputField {
-                name: "version",
-                ty: "string",
-            },
-        ],
-    }
 }
 
 fn schema_self() -> Command {
@@ -394,9 +370,9 @@ mod tests {
     }
 
     #[test]
-    fn build_emits_twentyseven_commands() {
-        // archives + init + 17 API commands + 3 transcripts subcommands + cache info/clear/prune + schema + version.
-        assert_eq!(build().commands.len(), 27);
+    fn build_emits_twentysix_commands() {
+        // archives + 17 API commands + 3 transcripts subcommands + cache info/clear/prune + schema + version.
+        assert_eq!(build().commands.len(), 26);
     }
 
     #[test]

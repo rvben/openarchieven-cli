@@ -175,26 +175,6 @@ expression: s
       ]
     },
     {
-      "name": "init",
-      "description": "Verify the tool is installed and ready; exits 0 with a JSON confirmation",
-      "mutating": false,
-      "response_shape": "single-flat",
-      "paginated": false,
-      "cache_ttl_seconds": null,
-      "cache_ttl_strategy": "none",
-      "args": [],
-      "output_fields": [
-        {
-          "name": "initialized",
-          "type": "bool"
-        },
-        {
-          "name": "version",
-          "type": "string"
-        }
-      ]
-    },
-    {
       "name": "search",
       "description": "Free-text record search across all archives.",
       "mutating": false,
