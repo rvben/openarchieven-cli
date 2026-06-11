@@ -62,6 +62,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/rvben/openarchieven-cli/compare/v0.4.0...v0.4.1) - 2026-06-11
+
+### Added
+
+- achieve clispec v0.2 full compliance (25/25) ([f218862](https://github.com/rvben/openarchieven-cli/commit/f21886241bddea3eb18be0f110e7eec44f76427f))
+
+
+
 ## [0.1.0] - 2026-04-30
 
 Initial release.
