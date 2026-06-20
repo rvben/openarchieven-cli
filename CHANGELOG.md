@@ -62,6 +62,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.3](https://github.com/rvben/openarchieven-cli/compare/v0.4.2...v0.4.3) - 2026-06-20
+
+### Added
+
+- **schema**: add output_field and arg descriptions throughout ([c1650cd](https://github.com/rvben/openarchieven-cli/commit/c1650cd1417e35671b1f99bc909e74f8ea4b5e31))
+
+
+
 ## [0.4.2](https://github.com/rvben/openarchieven-cli/compare/v0.4.1...v0.4.2) - 2026-06-20
 
 ### Added
