@@ -37,7 +37,7 @@ pub fn schema() -> Command {
             ty: "string",
             required: false,
             positional: false,
-            description: None,
+            description: Some("Filter results to a specific archive code"),
             default: None,
             min: None,
             max: None,
@@ -47,17 +47,17 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<row>",
-                description: None,
+                description: Some("Per-archive comment count rows"),
             },
             OutputField {
                 name: "total",
                 ty: "integer",
-                description: None,
+                description: Some("Number of rows returned"),
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
-                description: None,
+                description: Some("Always false; this command is non-paginated"),
             },
         ],
     }

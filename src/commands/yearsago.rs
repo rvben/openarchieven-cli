@@ -105,7 +105,7 @@ pub fn schema() -> Command {
                 ty: "integer",
                 required: true,
                 positional: true,
-                description: None,
+                description: Some("Number of years to look back from today"),
                 default: None,
                 min: Some(0),
                 max: None,
@@ -116,7 +116,7 @@ pub fn schema() -> Command {
                 ty: "integer",
                 required: false,
                 positional: false,
-                description: None,
+                description: Some("Maximum number of results to return (1-100)"),
                 default: Some(serde_json::json!(10)),
                 min: Some(1),
                 max: Some(100),
@@ -127,17 +127,17 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<record>",
-                description: None,
+                description: Some("Records from exactly N years ago today, from /response/docs"),
             },
             OutputField {
                 name: "total",
                 ty: "integer",
-                description: None,
+                description: Some("Number of items in this response (not a server-side total)"),
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
-                description: None,
+                description: Some("Always false; this command uses limit-only pagination"),
             },
         ],
     }

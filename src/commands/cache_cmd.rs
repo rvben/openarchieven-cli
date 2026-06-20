@@ -47,27 +47,31 @@ pub fn info_schema() -> Command {
             OutputField {
                 name: "root",
                 ty: "string",
-                description: None,
+                description: Some("Absolute path to the cache directory"),
             },
             OutputField {
                 name: "entries",
                 ty: "integer",
-                description: None,
+                description: Some("Number of cache entry files currently on disk"),
             },
             OutputField {
                 name: "bytes",
                 ty: "integer",
-                description: None,
+                description: Some("Total size of all cache entries in bytes"),
             },
             OutputField {
                 name: "oldest",
                 ty: "datetime | null",
-                description: None,
+                description: Some(
+                    "RFC 3339 timestamp of the oldest cache entry; null if cache is empty",
+                ),
             },
             OutputField {
                 name: "newest",
                 ty: "datetime | null",
-                description: None,
+                description: Some(
+                    "RFC 3339 timestamp of the newest cache entry; null if cache is empty",
+                ),
             },
         ],
     }
@@ -87,7 +91,7 @@ pub fn clear_schema() -> Command {
             ty: "boolean",
             required: true,
             positional: false,
-            description: None,
+            description: Some("Required safety flag to confirm the destructive clear operation"),
             default: None,
             min: None,
             max: None,
@@ -96,7 +100,7 @@ pub fn clear_schema() -> Command {
         output_fields: vec![OutputField {
             name: "deleted",
             ty: "integer",
-            description: None,
+            description: Some("Number of cache entry files deleted"),
         }],
     }
 }
@@ -114,7 +118,7 @@ pub fn prune_schema() -> Command {
         output_fields: vec![OutputField {
             name: "deleted",
             ty: "integer",
-            description: None,
+            description: Some("Number of expired cache entry files deleted"),
         }],
     }
 }

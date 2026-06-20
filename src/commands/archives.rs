@@ -57,27 +57,27 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<archive>",
-                description: None,
+                description: Some("Archive objects returned by the API"),
             },
             OutputField {
                 name: "total",
                 ty: "integer",
-                description: None,
+                description: Some("Total number of archives in the response"),
             },
             OutputField {
                 name: "limit",
                 ty: "null",
-                description: None,
+                description: Some("Always null; this command is non-paginated"),
             },
             OutputField {
                 name: "offset",
                 ty: "null",
-                description: None,
+                description: Some("Always null; this command is non-paginated"),
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
-                description: None,
+                description: Some("Always false for this command"),
             },
         ],
     }

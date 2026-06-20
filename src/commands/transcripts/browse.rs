@@ -90,7 +90,9 @@ pub fn schema() -> Command {
                 ty: "string",
                 required: false,
                 positional: false,
-                description: None,
+                description: Some(
+                    "Scope browse to a specific archive code; omit to list all archives",
+                ),
                 default: None,
                 min: None,
                 max: None,
@@ -101,7 +103,9 @@ pub fn schema() -> Command {
                 ty: "string",
                 required: false,
                 positional: false,
-                description: None,
+                description: Some(
+                    "Scope browse to a specific archive number; requires --archive-code",
+                ),
                 default: None,
                 min: None,
                 max: None,
@@ -112,7 +116,7 @@ pub fn schema() -> Command {
                 ty: "string",
                 required: false,
                 positional: false,
-                description: None,
+                description: Some("Response language for labels and descriptions"),
                 default: Some(serde_json::json!("nl")),
                 min: None,
                 max: None,
@@ -128,27 +132,27 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<browse_item>",
-                description: None,
+                description: Some("Hierarchical browse items from /response/docs"),
             },
             OutputField {
                 name: "total",
                 ty: "integer",
-                description: None,
+                description: Some("Number of browse items in this response"),
             },
             OutputField {
                 name: "limit",
                 ty: "null",
-                description: None,
+                description: Some("Always null; this command is non-paginated"),
             },
             OutputField {
                 name: "offset",
                 ty: "null",
-                description: None,
+                description: Some("Always null; this command is non-paginated"),
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
-                description: None,
+                description: Some("Always false for this command"),
             },
         ],
     }
