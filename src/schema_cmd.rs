@@ -6,6 +6,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct Schema {
+    pub clispec: &'static str,
     pub name: &'static str,
     pub version: &'static str,
     pub base_url: &'static str,
@@ -15,6 +16,7 @@ pub struct Schema {
     pub env_vars: Vec<EnvVar>,
     pub cache: CacheInfo,
     pub commands: Vec<Command>,
+    pub outcomes: Vec<Outcome>,
     pub errors: Vec<ErrorEntry>,
 }
 
@@ -69,6 +71,8 @@ pub struct Arg {
     pub required: bool,
     pub positional: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min: Option<i64>,
@@ -83,18 +87,33 @@ pub struct OutputField {
     pub name: &'static str,
     #[serde(rename = "type")]
     pub ty: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Outcome {
+    pub kind: &'static str,
+    pub exit_code: u8,
+    pub retryable: bool,
+    pub description: &'static str,
 }
 
 #[derive(Debug, Serialize)]
 pub struct ErrorEntry {
     pub kind: &'static str,
-    pub retryable: bool,
     pub exit_code: u8,
+    pub retryable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<&'static str>,
     pub fields: Vec<&'static str>,
 }
 
 pub fn build() -> Schema {
     Schema {
+        clispec: "0.2",
         name: "openarchieven",
         version: env!("CARGO_PKG_VERSION"),
         base_url: "https://api.openarchieven.nl/1.1",
@@ -136,58 +155,82 @@ pub fn build() -> Schema {
             dir_permissions: "0700",
         },
         commands: commands(),
+        outcomes: outcomes(),
         errors: errors(),
     }
+}
+
+fn outcomes() -> Vec<Outcome> {
+    // This is a read-only API tool; all commands either succeed (exit 0) or
+    // surface one of the error kinds below. There are no semantic non-error
+    // exit codes beyond the error table.
+    vec![]
 }
 
 fn errors() -> Vec<ErrorEntry> {
     vec![
         ErrorEntry {
             kind: "validation",
-            retryable: false,
             exit_code: 2,
+            retryable: false,
+            message: Some("Invalid argument or unsupported parameter combination"),
+            hint: Some("Run openarchieven <command> --help"),
             fields: vec!["kind", "message", "upstream_code", "upstream_message"],
         },
         ErrorEntry {
             kind: "not_found",
-            retryable: false,
             exit_code: 1,
+            retryable: false,
+            message: Some("Requested record or resource does not exist"),
+            hint: None,
             fields: vec!["kind", "message"],
         },
         ErrorEntry {
             kind: "rate_limit",
-            retryable: true,
             exit_code: 1,
+            retryable: true,
+            message: Some("API rate limit exceeded; wait retry_after_seconds before retrying"),
+            hint: None,
             fields: vec!["kind", "message", "retry_after_seconds"],
         },
         ErrorEntry {
             kind: "timeout",
-            retryable: true,
             exit_code: 1,
+            retryable: true,
+            message: Some("Request timed out"),
+            hint: None,
             fields: vec!["kind", "message"],
         },
         ErrorEntry {
             kind: "network",
-            retryable: true,
             exit_code: 1,
+            retryable: true,
+            message: Some("Network-level error (DNS, TCP, TLS)"),
+            hint: None,
             fields: vec!["kind", "message"],
         },
         ErrorEntry {
             kind: "server",
-            retryable: true,
             exit_code: 1,
+            retryable: true,
+            message: Some("Upstream API returned an unexpected 5xx response"),
+            hint: None,
             fields: vec!["kind", "message"],
         },
         ErrorEntry {
             kind: "parse",
-            retryable: false,
             exit_code: 1,
+            retryable: false,
+            message: Some("API response could not be parsed"),
+            hint: None,
             fields: vec!["kind", "message"],
         },
         ErrorEntry {
             kind: "conflict",
-            retryable: false,
             exit_code: 1,
+            retryable: false,
+            message: Some("Operation conflicted with current state"),
+            hint: None,
             fields: vec!["kind", "message"],
         },
     ]
@@ -347,6 +390,7 @@ fn version_self() -> Command {
         output_fields: vec![OutputField {
             name: "version",
             ty: "string",
+            description: Some("Semver version string of the binary"),
         }],
     }
 }

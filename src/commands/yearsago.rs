@@ -105,6 +105,7 @@ pub fn schema() -> Command {
                 ty: "integer",
                 required: true,
                 positional: true,
+                description: None,
                 default: None,
                 min: Some(0),
                 max: None,
@@ -115,6 +116,7 @@ pub fn schema() -> Command {
                 ty: "integer",
                 required: false,
                 positional: false,
+                description: None,
                 default: Some(serde_json::json!(10)),
                 min: Some(1),
                 max: Some(100),
@@ -125,14 +127,17 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<record>",
+                description: None,
             },
             OutputField {
                 name: "total",
                 ty: "integer",
+                description: None,
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
+                description: None,
             },
         ],
     }

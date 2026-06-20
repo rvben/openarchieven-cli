@@ -47,22 +47,27 @@ pub fn info_schema() -> Command {
             OutputField {
                 name: "root",
                 ty: "string",
+                description: None,
             },
             OutputField {
                 name: "entries",
                 ty: "integer",
+                description: None,
             },
             OutputField {
                 name: "bytes",
                 ty: "integer",
+                description: None,
             },
             OutputField {
                 name: "oldest",
                 ty: "datetime | null",
+                description: None,
             },
             OutputField {
                 name: "newest",
                 ty: "datetime | null",
+                description: None,
             },
         ],
     }
@@ -82,6 +87,7 @@ pub fn clear_schema() -> Command {
             ty: "boolean",
             required: true,
             positional: false,
+            description: None,
             default: None,
             min: None,
             max: None,
@@ -90,6 +96,7 @@ pub fn clear_schema() -> Command {
         output_fields: vec![OutputField {
             name: "deleted",
             ty: "integer",
+            description: None,
         }],
     }
 }
@@ -107,6 +114,7 @@ pub fn prune_schema() -> Command {
         output_fields: vec![OutputField {
             name: "deleted",
             ty: "integer",
+            description: None,
         }],
     }
 }

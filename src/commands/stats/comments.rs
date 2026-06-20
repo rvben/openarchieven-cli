@@ -37,6 +37,7 @@ pub fn schema() -> Command {
             ty: "string",
             required: false,
             positional: false,
+            description: None,
             default: None,
             min: None,
             max: None,
@@ -46,14 +47,17 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<row>",
+                description: None,
             },
             OutputField {
                 name: "total",
                 ty: "integer",
+                description: None,
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
+                description: None,
             },
         ],
     }

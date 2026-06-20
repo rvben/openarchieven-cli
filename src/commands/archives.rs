@@ -57,22 +57,27 @@ pub fn schema() -> Command {
             OutputField {
                 name: "items",
                 ty: "array<archive>",
+                description: None,
             },
             OutputField {
                 name: "total",
                 ty: "integer",
+                description: None,
             },
             OutputField {
                 name: "limit",
                 ty: "null",
+                description: None,
             },
             OutputField {
                 name: "offset",
                 ty: "null",
+                description: None,
             },
             OutputField {
                 name: "paginated",
                 ty: "boolean",
+                description: None,
             },
         ],
     }

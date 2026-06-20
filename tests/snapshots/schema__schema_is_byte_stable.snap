@@ -3,6 +3,7 @@ source: tests/schema.rs
 expression: s
 ---
 {
+  "clispec": "0.2",
   "name": "openarchieven",
   "version": "[version]",
   "base_url": "https://api.openarchieven.nl/1.1",
@@ -1592,16 +1593,20 @@ expression: s
       "output_fields": [
         {
           "name": "version",
-          "type": "string"
+          "type": "string",
+          "description": "Semver version string of the binary"
         }
       ]
     }
   ],
+  "outcomes": [],
   "errors": [
     {
       "kind": "validation",
-      "retryable": false,
       "exit_code": 2,
+      "retryable": false,
+      "message": "Invalid argument or unsupported parameter combination",
+      "hint": "Run openarchieven <command> --help",
       "fields": [
         "kind",
         "message",
@@ -1611,8 +1616,9 @@ expression: s
     },
     {
       "kind": "not_found",
-      "retryable": false,
       "exit_code": 1,
+      "retryable": false,
+      "message": "Requested record or resource does not exist",
       "fields": [
         "kind",
         "message"
@@ -1620,8 +1626,9 @@ expression: s
     },
     {
       "kind": "rate_limit",
-      "retryable": true,
       "exit_code": 1,
+      "retryable": true,
+      "message": "API rate limit exceeded; wait retry_after_seconds before retrying",
       "fields": [
         "kind",
         "message",
@@ -1630,8 +1637,9 @@ expression: s
     },
     {
       "kind": "timeout",
-      "retryable": true,
       "exit_code": 1,
+      "retryable": true,
+      "message": "Request timed out",
       "fields": [
         "kind",
         "message"
@@ -1639,8 +1647,9 @@ expression: s
     },
     {
       "kind": "network",
-      "retryable": true,
       "exit_code": 1,
+      "retryable": true,
+      "message": "Network-level error (DNS, TCP, TLS)",
       "fields": [
         "kind",
         "message"
@@ -1648,8 +1657,9 @@ expression: s
     },
     {
       "kind": "server",
-      "retryable": true,
       "exit_code": 1,
+      "retryable": true,
+      "message": "Upstream API returned an unexpected 5xx response",
       "fields": [
         "kind",
         "message"
@@ -1657,8 +1667,9 @@ expression: s
     },
     {
       "kind": "parse",
-      "retryable": false,
       "exit_code": 1,
+      "retryable": false,
+      "message": "API response could not be parsed",
       "fields": [
         "kind",
         "message"
@@ -1666,8 +1677,9 @@ expression: s
     },
     {
       "kind": "conflict",
-      "retryable": false,
       "exit_code": 1,
+      "retryable": false,
+      "message": "Operation conflicted with current state",
       "fields": [
         "kind",
         "message"
