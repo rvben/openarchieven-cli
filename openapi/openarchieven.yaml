@@ -63,6 +63,18 @@ paths:
           schema:
             type: string
           example: bhi
+        - name: not_archive
+          in: query
+          required: false
+          description: >
+            When set to `1` in combination with `archive_code`, results from the
+            selected archive are excluded instead of the search being restricted
+            to it. Has no effect without `archive_code`.
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+          example: 1
         - name: number_show
           in: query
           required: false

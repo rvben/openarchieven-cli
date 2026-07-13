@@ -55,6 +55,7 @@
       "eventplace",
       "lang",
       "name",
+      "not_archive",
       "number_show",
       "relationtype",
       "sort",
