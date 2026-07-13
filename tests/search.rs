@@ -74,13 +74,7 @@ fn search_passes_pagination_and_lang() {
 
     let args = search::Args {
         name: "jansen".into(),
-        archive: None,
-        source_type: None,
-        event_place: None,
-        birth_place: None,
-        relation_type: None,
-        country: None,
-        sort: None,
+        ..Default::default()
     };
 
     let r = search::run(&client, Some(&cache), &ctx, &args).unwrap();
@@ -106,13 +100,7 @@ fn search_rejects_unknown_lang() {
 
     let args = search::Args {
         name: "jansen".into(),
-        archive: None,
-        source_type: None,
-        event_place: None,
-        birth_place: None,
-        relation_type: None,
-        country: None,
-        sort: None,
+        ..Default::default()
     };
 
     let err = search::run(&client, Some(&cache), &ctx, &args).unwrap_err();
@@ -138,13 +126,7 @@ fn search_caps_limit_at_100() {
 
     let args = search::Args {
         name: "jansen".into(),
-        archive: None,
-        source_type: None,
-        event_place: None,
-        birth_place: None,
-        relation_type: None,
-        country: None,
-        sort: None,
+        ..Default::default()
     };
 
     let err = search::run(&client, Some(&cache), &ctx, &args).unwrap_err();
@@ -183,6 +165,30 @@ fn search_rejects_zero_limit() {
 }
 
 #[test]
+fn search_rejects_not_archive_without_archive() {
+    let rt = rt();
+    let server = rt.block_on(MockServer::start());
+
+    let dir = tempdir().unwrap();
+    let cache = Cache::open(dir.path().to_path_buf(), false).unwrap();
+    let client = client(&server);
+
+    let args = search::Args {
+        name: "jansen".into(),
+        not_archive: true,
+        ..Default::default()
+    };
+
+    let err = search::run(&client, Some(&cache), &ctx(), &args).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Validation);
+    assert!(
+        err.message().contains("--archive"),
+        "msg: {}",
+        err.message()
+    );
+}
+
+#[test]
 fn search_sends_optional_filters() {
     let rt = rt();
     let server = rt.block_on(MockServer::start());
@@ -191,6 +197,7 @@ fn search_sends_optional_filters() {
             .and(path("/records/search.json"))
             .and(query_param("name", "jansen"))
             .and(query_param("archive_code", "elo"))
+            .and(query_param("not_archive", "1"))
             .and(query_param("sourcetype", "BS"))
             .and(query_param("eventplace", "Amsterdam"))
             .and(query_param("birthplace", "Leiden"))
@@ -211,6 +218,7 @@ fn search_sends_optional_filters() {
     let args = search::Args {
         name: "jansen".into(),
         archive: Some("elo".into()),
+        not_archive: true,
         source_type: Some("BS".into()),
         event_place: Some("Amsterdam".into()),
         birth_place: Some("Leiden".into()),

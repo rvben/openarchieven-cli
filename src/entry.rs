@@ -104,6 +104,7 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             let crate::cli::SearchArgs {
                 name,
                 archive,
+                not_archive,
                 source_type,
                 event_place,
                 birth_place,
@@ -115,6 +116,7 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
                 let typed = crate::commands::search::Args {
                     name,
                     archive,
+                    not_archive,
                     source_type,
                     event_place,
                     birth_place,

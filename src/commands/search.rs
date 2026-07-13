@@ -15,6 +15,7 @@ pub const DEFAULT_LIMIT: u32 = 10;
 pub struct Args {
     pub name: String,
     pub archive: Option<String>,
+    pub not_archive: bool,
     pub source_type: Option<String>,
     pub event_place: Option<String>,
     pub birth_place: Option<String>,
@@ -67,6 +68,15 @@ pub fn run(
 
     if let Some(ref v) = args.archive {
         params.push(("archive_code", v.as_str()));
+    }
+    if args.not_archive {
+        if args.archive.is_none() {
+            return Err(Error::new(
+                ErrorKind::Validation,
+                "--not-archive requires --archive",
+            ));
+        }
+        params.push(("not_archive", "1"));
     }
     if let Some(ref v) = args.source_type {
         params.push(("sourcetype", v.as_str()));
@@ -134,6 +144,19 @@ pub fn schema() -> Command {
                 positional: false,
                 description: Some("Filter by archive code"),
                 default: None,
+                min: None,
+                max: None,
+                r#enum: None,
+            },
+            Arg {
+                name: "--not-archive",
+                ty: "boolean",
+                required: false,
+                positional: false,
+                description: Some(
+                    "Exclude the archive given via --archive instead of restricting to it",
+                ),
+                default: Some(serde_json::json!(false)),
                 min: None,
                 max: None,
                 r#enum: None,

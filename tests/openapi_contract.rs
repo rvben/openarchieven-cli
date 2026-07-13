@@ -261,6 +261,7 @@ fn search_request_matches_spec() {
     let args = commands::search::Args {
         name: "jansen".into(),
         archive: Some("elo".into()),
+        not_archive: true,
         source_type: Some("BS Geboorte".into()),
         event_place: Some("Rotterdam".into()),
         birth_place: Some("Leiden".into()),
@@ -277,6 +278,7 @@ fn search_request_matches_spec() {
             "start",
             "lang",
             "archive_code",
+            "not_archive",
             "sourcetype",
             "eventplace",
             "birthplace",

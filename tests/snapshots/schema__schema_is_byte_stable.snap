@@ -1,5 +1,6 @@
 ---
 source: tests/schema.rs
+assertion_line: 12
 expression: s
 ---
 {
@@ -202,6 +203,14 @@ expression: s
           "required": false,
           "positional": false,
           "description": "Filter by archive code"
+        },
+        {
+          "name": "--not-archive",
+          "type": "boolean",
+          "required": false,
+          "positional": false,
+          "description": "Exclude the archive given via --archive instead of restricting to it",
+          "default": false
         },
         {
           "name": "--source-type",

@@ -368,6 +368,9 @@ pub struct SearchArgs {
     /// Filter by archive code.
     #[arg(long)]
     pub archive: Option<String>,
+    /// Exclude the archive given via --archive instead of restricting to it.
+    #[arg(long, requires = "archive")]
+    pub not_archive: bool,
     /// Filter by source type (e.g. `BS Geboorte`).
     #[arg(long)]
     pub source_type: Option<String>,
