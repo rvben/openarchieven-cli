@@ -62,6 +62,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.4](https://github.com/rvben/openarchieven-cli/compare/v0.4.3...v0.4.4) - 2026-07-17
+
+### Added
+
+- **search**: add --not-archive flag to exclude an archive from results ([0ca4964](https://github.com/rvben/openarchieven-cli/commit/0ca4964833d3db071d2d7b453e14341aa2691ffc))
+
+
+
 ## [0.4.3](https://github.com/rvben/openarchieven-cli/compare/v0.4.2...v0.4.3) - 2026-06-20
 
 ### Added
