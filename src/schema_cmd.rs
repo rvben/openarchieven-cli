@@ -160,6 +160,94 @@ pub fn build() -> Schema {
     }
 }
 
+/// Build the canonical clispec v0.3 document emitted by the CLI.
+pub fn build_v0_3() -> serde_json::Value {
+    let mut value = serde_json::to_value(build()).expect("schema always serializes");
+    value["clispec"] = serde_json::json!("0.3");
+    value["output"] = serde_json::json!({"tty":"table","piped":"json"});
+    if let Some(args) = value["global_args"].as_array_mut() {
+        for arg in args {
+            if let Some(object) = arg.as_object_mut()
+                && object.get("short").is_some_and(serde_json::Value::is_null)
+            {
+                object.remove("short");
+            }
+        }
+    }
+    let Some(commands) = value["commands"].as_array_mut() else {
+        return value;
+    };
+    for command in commands {
+        let Some(object) = command.as_object_mut() else {
+            continue;
+        };
+        let name = object["name"].as_str().unwrap_or_default().to_string();
+        let mutating = object["mutating"].as_bool().unwrap_or(false);
+        object.insert(
+            "effects".into(),
+            serde_json::json!(if !mutating { "read_only" } else { "idempotent" }),
+        );
+        let paginated = object
+            .remove("paginated")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        object.insert(
+            "cardinality".into(),
+            serde_json::json!(if paginated { "unbounded" } else { "bounded" }),
+        );
+        if paginated {
+            object.insert(
+                "pagination".into(),
+                serde_json::json!({"style":"offset","limit_arg":"--limit","offset_arg":"--offset"}),
+            );
+            object.insert("fields_arg".into(), serde_json::json!("--fields"));
+        }
+        if name == "version" {
+            object.insert("example".into(), serde_json::json!({"args":["version"]}));
+        }
+        if name == "schema" {
+            object.remove("output_fields");
+            object.insert("cardinality".into(), serde_json::json!("single"));
+            object.insert(
+                "stdout_schema".into(),
+                serde_json::json!({"$ref":"https://clispec.dev/schema/v0.3.json"}),
+            );
+        }
+        if let Some(fields) = object
+            .get_mut("output_fields")
+            .and_then(serde_json::Value::as_array_mut)
+        {
+            for field in fields {
+                let Some(field) = field.as_object_mut() else {
+                    continue;
+                };
+                let kind = field
+                    .get("type")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("string")
+                    .to_string();
+                if kind.starts_with("array<") {
+                    field.insert("type".into(), serde_json::json!("array"));
+                    field.insert("items".into(), serde_json::json!({"type":"object"}));
+                } else if let Some(base) = kind.strip_suffix(" | null") {
+                    field.insert(
+                        "type".into(),
+                        serde_json::json!(if base == "datetime" { "string" } else { base }),
+                    );
+                    field.insert("nullable".into(), serde_json::json!(true));
+                } else if kind == "null" {
+                    field.insert("type".into(), serde_json::json!("string"));
+                    field.insert("nullable".into(), serde_json::json!(true));
+                }
+            }
+        }
+        if !object.contains_key("output_fields") && !object.contains_key("stdout_schema") {
+            object.insert("stdout_schema".into(), serde_json::json!({}));
+        }
+    }
+    value
+}
+
 fn outcomes() -> Vec<Outcome> {
     // This is a read-only API tool; all commands either succeed (exit 0) or
     // surface one of the error kinds below. There are no semantic non-error

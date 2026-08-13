@@ -83,7 +83,7 @@ fn dispatch(cli: Cli) -> Result<(), Error> {
             })
         }
         Cmd::Schema => {
-            let schema = crate::schema_cmd::build();
+            let schema = crate::schema_cmd::build_v0_3();
             if global.format == crate::tty::Format::Ndjson {
                 return Err(Error::new(
                     ErrorKind::Validation,
