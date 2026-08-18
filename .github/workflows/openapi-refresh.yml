@@ -2,7 +2,7 @@ name: OpenAPI Spec Drift
 
 on:
   schedule:
-    # Mondays at 06:00 UTC — pick up upstream changes once a week.
+    # Mondays at 06:00 UTC, to pick up upstream changes once a week.
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
@@ -56,17 +56,10 @@ jobs:
           branch: chore/openapi-refresh
           title: "chore(openapi): refresh vendored spec"
           commit-message: "chore(openapi): refresh vendored spec"
-          body: |
-            Automated weekly refresh of the vendored OpenAPI spec from
-            `https://api.openarchieven.nl/openapi.yaml`.
-
-            - Updates `openapi/openarchieven.yaml`
-            - Updates `openapi/openarchieven.sha256`
-            - Regenerates `openapi/params-manifest.json`
-
-            The contract tests in `tests/openapi_contract.rs` ran green against
-            the refreshed manifest before this PR was opened. Review the diff
-            to confirm any new/removed query parameters are intentional.
+          # Written by `make openapi-refresh`, which diffs the regenerated
+          # manifest against the copy it replaced. The spec diff alone buries
+          # the question this PR exists to ask.
+          body-path: target/openapi-refresh-body.md
           add-paths: |
             openapi/openarchieven.yaml
             openapi/openarchieven.sha256
