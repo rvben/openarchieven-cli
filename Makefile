@@ -2,7 +2,7 @@
         release-patch release-minor release-major \
         release-build release-archive homebrew-formula \
         build-wheel build-sdist publish-crates publish-pypi \
-        openapi-refresh openapi-check \
+        openapi-refresh openapi-check openapi-drift-status \
         test-live clean
 
 check: lint test
@@ -91,10 +91,19 @@ publish-pypi:
 openapi-refresh:
 	./scripts/refresh-openapi.py --refresh
 
-# Fail if the vendored spec sha differs from the live one. Used by the
-# weekly cron in .github/workflows/openapi-refresh.yml to open a drift PR.
+# Fail if the vendored spec sha differs from the live one. The human-facing
+# gate: drift is an error here.
 openapi-check:
 	./scripts/refresh-openapi.py --check
+
+# Print `changed=true` or `changed=false` and exit 0 either way, for the weekly
+# cron in .github/workflows/openapi-refresh.yml to branch on. Make reports its
+# own exit status 2 for any recipe failure, so a drift signalled by an exit code
+# arrives indistinguishable from a broken toolchain; the verdict travels on
+# stdout instead. Genuine failures still exit non-zero. The recipe is silent so
+# that stdout carries nothing but the verdict.
+openapi-drift-status:
+	@./scripts/refresh-openapi.py --status
 
 test-live:
 	OPENARCHIEVEN_TEST_LIVE=1 cargo test --test live -- --nocapture

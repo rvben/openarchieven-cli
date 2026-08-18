@@ -14,20 +14,29 @@ that outbound CLI requests use only names that appear in the matching entry.
 Modes:
   --refresh   (default) Overwrite all three artifacts from the live source.
   --check     Download into memory and fail if the live SHA differs from the
-              vendored one. CI uses this on a schedule to detect upstream drift.
+              vendored one. This is the human-facing gate: drift exits 1.
+  --status    Print `changed=true` or `changed=false` on stdout and exit 0
+              either way. The weekly CI workflow branches on this, because
+              `make` reports its own exit status 2 for every recipe failure
+              and cannot pass a drift exit code through to the caller.
+
+`OPENARCHIEVEN_SPEC_URL` overrides the source URL for every mode.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
 
 import yaml
 
-SPEC_URL = "https://api.openarchieven.nl/openapi.yaml"
+SPEC_URL = os.environ.get(
+    "OPENARCHIEVEN_SPEC_URL", "https://api.openarchieven.nl/openapi.yaml"
+)
 USER_AGENT = "openarchieven-cli/refresh-openapi"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -81,17 +90,34 @@ def write_artifacts(spec_bytes: bytes) -> None:
     print(f"wrote {MANIFEST_PATH.relative_to(REPO_ROOT)} ({len(manifest)} paths)")
 
 
-def check_drift() -> int:
-    live = fetch(SPEC_URL)
-    live_digest = hashlib.sha256(live).hexdigest()
+def compare_with_live() -> tuple[bool, str, str]:
+    """Return (drifted, vendored_digest, live_digest).
+
+    Raises FileNotFoundError when there is nothing vendored to compare against;
+    a missing baseline is neither drift nor agreement and must not be reported
+    as either. Fetch failures propagate for the same reason.
+    """
+    live_digest = hashlib.sha256(fetch(SPEC_URL)).hexdigest()
     if not SHA_PATH.exists():
-        print(
-            f"no vendored sha at {SHA_PATH.relative_to(REPO_ROOT)}; run --refresh first",
-            file=sys.stderr,
-        )
-        return 2
+        raise FileNotFoundError(SHA_PATH)
     vendored_digest = SHA_PATH.read_text().strip()
-    if live_digest == vendored_digest:
+    return live_digest != vendored_digest, vendored_digest, live_digest
+
+
+def missing_baseline_message() -> None:
+    print(
+        f"no vendored sha at {SHA_PATH.relative_to(REPO_ROOT)}; run --refresh first",
+        file=sys.stderr,
+    )
+
+
+def check_drift() -> int:
+    try:
+        drifted, vendored_digest, live_digest = compare_with_live()
+    except FileNotFoundError:
+        missing_baseline_message()
+        return 2
+    if not drifted:
         print(f"openapi spec up to date (sha256 {vendored_digest[:12]}…)")
         return 0
     print(
@@ -105,13 +131,42 @@ def check_drift() -> int:
     return 1
 
 
+def report_status() -> int:
+    """Emit the drift verdict as data on stdout, keeping exit codes for errors.
+
+    Callers consume stdout verbatim (the CI workflow appends it to
+    `$GITHUB_OUTPUT`), so the verdict is the only thing written there and every
+    diagnostic goes to stderr.
+    """
+    try:
+        drifted, vendored_digest, live_digest = compare_with_live()
+    except FileNotFoundError:
+        missing_baseline_message()
+        return 2
+    print("changed=true" if drifted else "changed=false")
+    print(
+        f"vendored: {vendored_digest}",
+        f"live:     {live_digest}",
+        sep="\n",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--refresh", action="store_true", help="download and overwrite (default)")
     mode.add_argument("--check", action="store_true", help="fail if vendored sha differs from live")
+    mode.add_argument(
+        "--status",
+        action="store_true",
+        help="print changed=true|false on stdout and exit 0",
+    )
     args = parser.parse_args()
 
+    if args.status:
+        return report_status()
     if args.check:
         return check_drift()
 

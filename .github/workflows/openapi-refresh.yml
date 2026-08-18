@@ -32,12 +32,13 @@ jobs:
       - name: Detect drift
         id: drift
         run: |
-          status=0
-          make openapi-check || status=$?
-          case "$status" in
-            0) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
-            1) echo "changed=true"  >> "$GITHUB_OUTPUT" ;;
-            *) echo "openapi-check failed with status $status" >&2; exit "$status" ;;
+          verdict="$(make openapi-drift-status)"
+          case "$verdict" in
+            changed=true|changed=false)
+              echo "$verdict" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "unexpected openapi-drift-status output: '$verdict'" >&2
+              exit 1 ;;
           esac
 
       - name: Refresh spec

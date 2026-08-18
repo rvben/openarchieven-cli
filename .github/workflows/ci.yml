@@ -26,6 +26,11 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
+      # tests/openapi_drift.rs runs `make openapi-drift-status`, which is a uv
+      # script. Without uv those tests fail rather than silently skip.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+
       - name: make check
         run: make check
 

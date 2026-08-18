@@ -14,9 +14,13 @@
 //!    listed in `INTENTIONALLY_UNWRAPPED`. New upstream endpoints can't slip
 //!    through silently — the test forces a deliberate decision.
 //!
-//! 3. **Drift detection** — `make openapi-check` (and a weekly CI cron) compare
+//! 3. **Drift detection** — `make openapi-check` compares
 //!    `openapi/openarchieven.sha256` against the live spec at
-//!    `https://api.openarchieven.nl/openapi.yaml`. A drift opens a refresh PR.
+//!    `https://api.openarchieven.nl/openapi.yaml` and fails on a mismatch. The
+//!    weekly CI cron uses `make openapi-drift-status` instead, which reports
+//!    the same comparison as data so it can open a refresh PR; the contract
+//!    between that target and the workflow is guarded by
+//!    `tests/openapi_drift.rs`.
 //!
 //! The manifest is regenerated from the live spec by `make openapi-refresh`.
 
