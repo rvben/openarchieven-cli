@@ -1,0 +1,22 @@
+# Dependency policy for `upd`. Auto-discovered from the repository root, so it
+# applies to the weekly `upd dependency health` workflow and to any local run.
+
+# These actions run only where CI cannot reach them. The artifact pair executes
+# when a tag is pushed; create-pull-request executes when the weekly spec drift
+# job finds a change. A bump to any of them passes every CI run and fails
+# afterwards, during a release or on an unattended schedule, so they move by
+# hand and the move is reviewed against the action's release notes.
+#
+# `ignore` rather than `[pin]`: upd 0.5.2 applies a `[pin]` range by writing the
+# constraint into the ref itself, producing `uses: actions/upload-artifact@v>=7,<8`,
+# which is not a valid reference. It reports zero updates and exits 0 while
+# doing so. A bare `[pin]` version is honored but reported nowhere. `ignore`
+# leaves the file alone and names each skipped action in the run report.
+#
+# Drop an entry once its upgrade can be validated before it matters, for example
+# by a CI job that exercises the same artifact round trip without publishing.
+ignore = [
+    "actions/upload-artifact",
+    "actions/download-artifact",
+    "peter-evans/create-pull-request",
+]
