@@ -16,4 +16,4 @@ jobs:
       upd-version: v0.5.2
       min-age: 7d
       max-bump: minor
-      fail-on-blocked: false
+      fail-on-blocked: true
