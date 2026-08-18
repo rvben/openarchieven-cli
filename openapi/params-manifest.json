@@ -79,6 +79,7 @@
     "query_params": [
       "callback",
       "number_show",
+      "synthetic_param",
       "years"
     ]
   },
@@ -92,17 +93,6 @@
       "province",
       "richness",
       "year"
-    ]
-  },
-  "/related/weather.json": {
-    "method": "GET",
-    "operationId": "getHistoricalWeather",
-    "query_params": [
-      "callback",
-      "date",
-      "lang",
-      "latitude",
-      "longitude"
     ]
   },
   "/stats/archives.json": {
