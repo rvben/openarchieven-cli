@@ -14,9 +14,10 @@ on:
 jobs:
   update-tap:
     name: Update Homebrew tap
-    # workflow_run fires on every Release run, including failures — gate
-    # on success here. workflow_dispatch always runs.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # workflow_run also fires for manual release rehearsals on main. Only a
+    # successful tag-push release may update the tap; workflow_dispatch remains
+    # the explicit recovery path for a known tag.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
