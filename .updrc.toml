@@ -13,10 +13,16 @@
 # doing so. A bare `[pin]` version is honored but reported nowhere. `ignore`
 # leaves the file alone and names each skipped action in the run report.
 #
+# dtolnay/rust-toolchain publishes no versioned releases: its only tag is the
+# floating `v1` alias, so no exact release tag can name a pinned commit and a
+# SHA pin can never carry the version comment upd needs to keep it updateable.
+# The pin tracks the commit `v1` currently names and moves by hand.
+#
 # Drop an entry once its upgrade can be validated before it matters, for example
 # by a CI job that exercises the same artifact round trip without publishing.
 ignore = [
     "actions/upload-artifact",
     "actions/download-artifact",
     "peter-evans/create-pull-request",
+    "dtolnay/rust-toolchain",
 ]
