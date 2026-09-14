@@ -19,6 +19,11 @@ jobs:
       lock: true
       min-age: 7d
       max-bump: minor
+      # tests/openapi_drift.rs and tests/openapi_refresh_body.rs run
+      # `make openapi-drift-status` / `make openapi-refresh`, which are uv
+      # scripts (see ci.yml). Without uv those tests fail rather than
+      # silently skip.
+      prepare-command: python3 -m pip install uv
       validation-command: make check
       fail-on-blocked: false
       branch: deps/upd
