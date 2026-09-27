@@ -62,6 +62,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.6](https://github.com/rvben/openarchieven-cli/compare/v0.4.5...v0.4.6) - 2026-09-27
+
+### Fixed
+
+- **deps**: update rustls to 0.23.45 for RUSTSEC-2026-0285 ([a7bd979](https://github.com/rvben/openarchieven-cli/commit/a7bd97902de2f275eec78a6ec870c9c5f6c08bcd))
+- **ci**: ignore release rehearsals in Homebrew ([312f371](https://github.com/rvben/openarchieven-cli/commit/312f371131c728c72b20427885f1b7c1a21f4075))
+- **ci**: install pinned Rust components ([da0aee1](https://github.com/rvben/openarchieven-cli/commit/da0aee183831437a827bf52bd40025dde39d9638))
+
 ## [0.4.4](https://github.com/rvben/openarchieven-cli/compare/v0.4.3...v0.4.4) - 2026-07-17
 
 ### Added
