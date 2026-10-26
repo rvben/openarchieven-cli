@@ -44,7 +44,7 @@ urlencoding = "2"
 assert_cmd = "2"
 insta = { version = "1", features = ["json", "redactions"] }
 predicates = "3"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1.53.3", features = ["rt", "macros"] }
 wiremock = "0.6"
 
 [profile.release]
