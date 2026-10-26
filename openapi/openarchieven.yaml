@@ -237,8 +237,11 @@ paths:
       description: >
         Returns one specific genealogical record in JSON format (UTF-8).
         The response conforms to the Archive 2 All (A2A) model.
-        Also available as XML, GEDCOM, Turtle (TTL) and N-Triples (NT) by
-        changing the file extension in the URL.
+        Also available as XML, GEDCOM, Turtle (TTL), N-Triples (NT) and
+        Markdown (MD, a compact human- and AI-readable summary with the
+        canonical record URL) by changing the file extension in the URL.
+        On the website the same formats are reachable as
+        https://www.openarchieven.nl/{archive}:{identifier}/md (and /json, /xml, /ttl, /gedcom).
         Note: version 1.1 features improved JSON/XML output and adds N-Triples
         and Turtle formats.
       parameters:
