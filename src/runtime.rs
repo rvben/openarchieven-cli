@@ -204,6 +204,8 @@ pub fn resolve_ttl(ctx: &ApiContext, default: TtlHint) -> TtlHint {
 
 #[cfg(test)]
 mod tests {
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     use super::*;
     use crate::cli::GlobalApiArgs;
     use std::time::Duration;
@@ -471,6 +473,7 @@ mod tests {
 
     #[test]
     fn build_cache_returns_none_when_bypass() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         let mut a = args();
         a.no_cache = true;
         let ctx = ApiContext::from_global_args(&a, false).unwrap();
@@ -480,6 +483,7 @@ mod tests {
 
     #[test]
     fn build_cache_with_explicit_dir_returns_some() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         let dir = tempfile::tempdir().unwrap();
         let mut a = args();
         a.cache_dir = Some(dir.path().to_path_buf());
@@ -490,6 +494,7 @@ mod tests {
 
     #[test]
     fn cache_disabled_via_env_returns_true_when_set_to_1() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("OPENARCHIEVEN_CACHE_DISABLE", "1") };
         let result = cache_disabled_via_env();
         unsafe { std::env::remove_var("OPENARCHIEVEN_CACHE_DISABLE") };
@@ -498,6 +503,7 @@ mod tests {
 
     #[test]
     fn cache_disabled_via_env_returns_false_for_other_values() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("OPENARCHIEVEN_CACHE_DISABLE", "0") };
         let result = cache_disabled_via_env();
         unsafe { std::env::remove_var("OPENARCHIEVEN_CACHE_DISABLE") };
@@ -506,6 +512,7 @@ mod tests {
 
     #[test]
     fn build_cache_returns_none_when_env_disable_is_1() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         let dir = tempfile::tempdir().unwrap();
         let mut a = args();
         a.cache_dir = Some(dir.path().to_path_buf());
@@ -518,6 +525,7 @@ mod tests {
 
     #[test]
     fn rate_limit_from_env_returns_some_for_valid_positive() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("OPENARCHIEVEN_RATE_LIMIT", "10") };
         let result = rate_limit_from_env();
         unsafe { std::env::remove_var("OPENARCHIEVEN_RATE_LIMIT") };
@@ -526,6 +534,7 @@ mod tests {
 
     #[test]
     fn rate_limit_from_env_returns_none_for_zero() {
+        let _env_guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("OPENARCHIEVEN_RATE_LIMIT", "0") };
         let result = rate_limit_from_env();
         unsafe { std::env::remove_var("OPENARCHIEVEN_RATE_LIMIT") };
